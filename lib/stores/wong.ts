@@ -1,6 +1,6 @@
-import { searchVtexStore } from './vtexSearch';
-import type { ProductIdentification } from '../productIdentification';
-import type { StoreProduct } from './types';
+import { searchVtexStore } from './vtexSearch.js';
+import type { ProductIdentification } from '../productIdentification.js';
+import type { StoreProduct } from './types.js';
 
 export function buscarWong(identification: ProductIdentification): Promise<StoreProduct | null> {
   return searchVtexStore(

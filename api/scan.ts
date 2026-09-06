@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleScan } from '../lib/scanHandler';
-import { ValidationError, IdentificationError } from '../lib/errors';
+import { handleScan } from '../lib/scanHandler.js';
+import { ValidationError, IdentificationError } from '../lib/errors.js';
 
 export const maxDuration = 60;
 

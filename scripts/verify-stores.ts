@@ -1,6 +1,6 @@
-import { buscarPlazaVea } from '../lib/stores/plazaVea';
-import { buscarWong } from '../lib/stores/wong';
-import type { ProductIdentification } from '../lib/productIdentification';
+import { buscarPlazaVea } from '../lib/stores/plazaVea.js';
+import { buscarWong } from '../lib/stores/wong.js';
+import type { ProductIdentification } from '../lib/productIdentification.js';
 
 const identification: ProductIdentification = {
   marca: 'Gloria',

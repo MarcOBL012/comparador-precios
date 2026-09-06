@@ -1,6 +1,6 @@
-import { pickBestMatch, type MatchCandidate } from '../matching';
-import type { ProductIdentification } from '../productIdentification';
-import type { StoreProduct } from './types';
+import { pickBestMatch, type MatchCandidate } from '../matching.js';
+import type { ProductIdentification } from '../productIdentification.js';
+import type { StoreProduct } from './types.js';
 
 interface VtexProduct {
   productName: string;

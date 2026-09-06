@@ -1,4 +1,4 @@
-import type { ProductIdentification } from './productIdentification';
+import type { ProductIdentification } from './productIdentification.js';
 
 export interface MatchCandidate {
   productName: string;

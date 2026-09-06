@@ -1,9 +1,9 @@
-import { ValidationError, IdentificationError } from './errors';
-import { identifyProduct } from './identifyProduct';
-import type { ProductIdentification } from './productIdentification';
-import { buscarPlazaVea } from './stores/plazaVea';
-import { buscarWong } from './stores/wong';
-import type { StoreProduct } from './stores/types';
+import { ValidationError, IdentificationError } from './errors.js';
+import { identifyProduct } from './identifyProduct.js';
+import type { ProductIdentification } from './productIdentification.js';
+import { buscarPlazaVea } from './stores/plazaVea.js';
+import { buscarWong } from './stores/wong.js';
+import type { StoreProduct } from './stores/types.js';
 
 const DATA_URI_PATTERN = /^data:image\/(jpeg|png|gif|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
 const MAX_IMAGE_BASE64_LENGTH = 4_000_000; // ~3MB decoded; stays under Vercel's 4.5MB request body limit

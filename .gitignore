@@ -2,3 +2,12 @@ node_modules/
 .env*
 !.env.example
 .vercel/
+# Android (Plan 3)
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+*.apk
+*.aab
+.vercel
