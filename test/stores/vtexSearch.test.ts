@@ -100,4 +100,22 @@ describe('searchVtexStore', () => {
 
     await expect(searchVtexStore(CONFIG, identification)).rejects.toThrow('Tienda Ejemplo respondió con estado 500');
   });
+
+  it('lanza un error descriptivo si la respuesta no es un array', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'not found' }));
+
+    await expect(searchVtexStore(CONFIG, identification)).rejects.toThrow(
+      'Tienda Ejemplo devolvió una respuesta inesperada'
+    );
+  });
+
+  it('lanza un error descriptivo si la petición es abortada por timeout', async () => {
+    const abortError = new Error('The operation was aborted');
+    abortError.name = 'AbortError';
+    fetchMock.mockRejectedValue(abortError);
+
+    await expect(searchVtexStore(CONFIG, identification)).rejects.toThrow(
+      'Tienda Ejemplo: tiempo de espera agotado (5000ms)'
+    );
+  });
 });

@@ -39,11 +39,32 @@ export async function searchVtexStore(
 
   let products: VtexProduct[];
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'ComparadorPreciosPeru/1.0',
+        },
+      });
+    } catch (err) {
+      const name = err instanceof Error ? err.name : undefined;
+      if (name === 'AbortError') {
+        throw new Error(`${config.storeName}: tiempo de espera agotado (${config.timeoutMs}ms)`);
+      }
+      throw err;
+    }
+
     if (!response.ok) {
       throw new Error(`${config.storeName} respondió con estado ${response.status}`);
     }
-    products = (await response.json()) as VtexProduct[];
+
+    const body: unknown = await response.json();
+    if (!Array.isArray(body)) {
+      throw new Error(`${config.storeName} devolvió una respuesta inesperada`);
+    }
+    products = body as VtexProduct[];
   } finally {
     clearTimeout(timeout);
   }
@@ -51,7 +72,7 @@ export async function searchVtexStore(
   const candidates: VtexCandidate[] = [];
   for (const product of products) {
     const offer = product.items?.[0]?.sellers?.[0]?.commertialOffer;
-    if (offer && offer.IsAvailable && offer.Price > 0) {
+    if (offer && offer.IsAvailable && offer.Price > 0 && product.productName && product.link) {
       candidates.push({
         productName: product.productName,
         brand: product.brand,
