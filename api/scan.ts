@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleScan } from '../lib/scanHandler';
 import { ValidationError, IdentificationError } from '../lib/errors';
 
+export const maxDuration = 60;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método no permitido. Usa POST.' });
@@ -12,6 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await handleScan(req.body);
     res.status(200).json(result);
   } catch (err) {
+    console.error('POST /api/scan failed:', err);
+    if (err instanceof IdentificationError && err.cause) {
+      console.error('IdentificationError cause:', err.cause);
+    }
     if (err instanceof ValidationError) {
       res.status(400).json({ error: err.message });
       return;

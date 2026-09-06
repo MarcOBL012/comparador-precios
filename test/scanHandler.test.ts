@@ -51,4 +51,17 @@ describe('handleScan', () => {
 
     await expect(handleScan({ image: 'data:image/jpeg;base64,ABC123' })).rejects.toThrow(IdentificationError);
   });
+
+  it('rechaza un tipo de imagen no soportado', async () => {
+    await expect(handleScan({ image: 'data:image/tiff;base64,ABC123' })).rejects.toThrow(ValidationError);
+  });
+
+  it('rechaza una data URI con payload base64 vacío', async () => {
+    await expect(handleScan({ image: 'data:image/jpeg;base64,' })).rejects.toThrow(ValidationError);
+  });
+
+  it('rechaza una imagen que excede el tamaño máximo', async () => {
+    const oversized = 'data:image/jpeg;base64,' + 'A'.repeat(4_000_001);
+    await expect(handleScan({ image: oversized })).rejects.toThrow(ValidationError);
+  });
 });

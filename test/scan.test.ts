@@ -44,6 +44,7 @@ describe('POST /api/scan', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Método no permitido. Usa POST.' });
   });
 
   it('responde 200 con la identificación en éxito', async () => {
