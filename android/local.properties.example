@@ -1,0 +1,2 @@
+# Copia a local.properties (no se commitea) y ajusta a tu backend desplegado.
+scanBaseUrl=https://tu-backend.vercel.app/

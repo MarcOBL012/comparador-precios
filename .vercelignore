@@ -1,0 +1,9 @@
+node_modules
+android
+.git
+.claude
+docs
+test
+scripts
+.env.local
+local.properties
