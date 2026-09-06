@@ -1,25 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { generateTextMock, objectMock } = vi.hoisted(() => ({
   generateTextMock: vi.fn(),
   objectMock: vi.fn((config: unknown) => ({ __schemaConfig: config })),
 }));
-const { buscarPlazaVeaMock } = vi.hoisted(() => ({
-  buscarPlazaVeaMock: vi.fn(),
-}));
-const { buscarWongMock } = vi.hoisted(() => ({
-  buscarWongMock: vi.fn(),
-}));
 
 vi.mock('ai', () => ({
   generateText: generateTextMock,
   Output: { object: objectMock },
-}));
-vi.mock('../lib/stores/plazaVea', () => ({
-  buscarPlazaVea: buscarPlazaVeaMock,
-}));
-vi.mock('../lib/stores/wong', () => ({
-  buscarWong: buscarWongMock,
 }));
 
 import handler from '../api/scan';
@@ -45,16 +33,24 @@ function createMockReq(method: string, body: unknown): VercelRequest {
   return { method, body } as VercelRequest;
 }
 
-describe('POST /api/scan (integración: scanHandler e identifyProduct reales)', () => {
+function vtexResponse(body: unknown, ok = true, status = 200) {
+  return { ok, status, json: async () => body } as Response;
+}
+
+describe('POST /api/scan (integración completa: scanHandler, identifyProduct y búsqueda VTEX reales)', () => {
+  const fetchMock = vi.fn();
+
   beforeEach(() => {
     generateTextMock.mockReset();
-    buscarPlazaVeaMock.mockReset();
-    buscarWongMock.mockReset();
-    buscarPlazaVeaMock.mockResolvedValue(null);
-    buscarWongMock.mockResolvedValue(null);
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
   });
 
-  it('responde 400 cuando la imagen no es una data URI válida, sin llamar a la IA', async () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('responde 400 cuando la imagen no es una data URI válida, sin llamar a la IA ni a las tiendas', async () => {
     const req = createMockReq('POST', { image: 'no-es-una-imagen' });
     const res = createMockRes();
 
@@ -62,9 +58,10 @@ describe('POST /api/scan (integración: scanHandler e identifyProduct reales)', 
 
     expect(res.statusCode).toBe(400);
     expect(generateTextMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('responde 200 con la identificación y las tiendas cuando la imagen es válida y la IA responde correctamente', async () => {
+  it('responde 200 con la identificación y las tiendas recorriendo la cadena real hasta la búsqueda VTEX', async () => {
     const identification = {
       marca: 'Gloria',
       nombre: 'Leche evaporada',
@@ -73,11 +70,16 @@ describe('POST /api/scan (integración: scanHandler e identifyProduct reales)', 
       confianza: 0.9,
     };
     generateTextMock.mockResolvedValue({ output: identification });
-    buscarPlazaVeaMock.mockResolvedValue({
-      producto: 'Leche Evaporada Gloria 400g',
-      precio: 4.5,
-      url: 'https://www.plazavea.com.pe/p/1',
-    });
+    fetchMock.mockResolvedValue(
+      vtexResponse([
+        {
+          productName: 'Leche Evaporada Gloria 400g',
+          brand: 'Gloria',
+          link: 'https://tienda.example.pe/p/1',
+          items: [{ sellers: [{ commertialOffer: { Price: 4.5, IsAvailable: true } }] }],
+        },
+      ])
+    );
 
     const req = createMockReq('POST', { image: 'data:image/jpeg;base64,ABC123' });
     const res = createMockRes();
@@ -85,6 +87,7 @@ describe('POST /api/scan (integración: scanHandler e identifyProduct reales)', 
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(res.body).toEqual({
       identification,
       tiendas: [
@@ -93,9 +96,15 @@ describe('POST /api/scan (integración: scanHandler e identifyProduct reales)', 
           estado: 'encontrado',
           producto: 'Leche Evaporada Gloria 400g',
           precio: 4.5,
-          url: 'https://www.plazavea.com.pe/p/1',
+          url: 'https://tienda.example.pe/p/1',
         },
-        { tienda: 'Wong', estado: 'no_encontrado' },
+        {
+          tienda: 'Wong',
+          estado: 'encontrado',
+          producto: 'Leche Evaporada Gloria 400g',
+          precio: 4.5,
+          url: 'https://tienda.example.pe/p/1',
+        },
       ],
     });
   });
