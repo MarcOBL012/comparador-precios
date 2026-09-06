@@ -49,4 +49,30 @@ describe('pickBestMatch', () => {
 
     expect(result).toEqual(candidates[0]);
   });
+
+  it('descarta un candidato de otra marca aunque el texto sea similar', () => {
+    const candidates = [{ productName: 'Leche Evaporada Laive 400g', brand: 'Laive' }];
+
+    expect(pickBestMatch(identification, candidates)).toBeNull();
+  });
+
+  it('penaliza candidatos de pack/multipack cuando la identificación no menciona pack', () => {
+    const candidates = [
+      { productName: 'Leche Evaporada Entera Gloria Lata 390g Paquete 6un', brand: 'Gloria' },
+      { productName: 'Pack x6 Leche Evaporada Gloria Entera', brand: 'Gloria' },
+    ];
+
+    expect(pickBestMatch(identification, candidates)).toBeNull();
+  });
+
+  it('prefiere la unidad individual sobre el pack cuando ambas están disponibles', () => {
+    const candidates = [
+      { productName: 'Pack x6 Leche Evaporada Gloria Entera', brand: 'Gloria' },
+      { productName: 'Leche Evaporada Entera Gloria Lata 400g', brand: 'Gloria' },
+    ];
+
+    const result = pickBestMatch(identification, candidates);
+
+    expect(result).toEqual(candidates[1]);
+  });
 });
