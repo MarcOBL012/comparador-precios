@@ -36,7 +36,7 @@ describe('identifyProduct', () => {
     expect(objectMock).toHaveBeenCalledWith({ schema: ProductIdentificationSchema });
 
     const callArgs = generateTextMock.mock.calls[0][0];
-    expect(callArgs.model).toBe('anthropic/claude-sonnet-5');
+    expect(callArgs.model.modelId).toBe('gemini-3.6-flash');
     expect(callArgs.messages).toEqual([
       {
         role: 'user',

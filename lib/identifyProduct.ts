@@ -1,7 +1,10 @@
 import { generateText, Output } from 'ai';
-import { ProductIdentificationSchema, type ProductIdentification } from './productIdentification';
+import { google } from '@ai-sdk/google';
+import { ProductIdentificationSchema, type ProductIdentification } from './productIdentification.js';
 
-const MODEL = 'anthropic/claude-sonnet-5';
+// Gemini Flash: rápido, barato y con visión. Lee la key de GOOGLE_GENERATIVE_AI_API_KEY.
+// (Antes: gateway de Vercel 'anthropic/claude-sonnet-5', que exige tarjeta en el proyecto.)
+const MODEL = google('gemini-3.6-flash');
 
 const IDENTIFICATION_PROMPT = `Eres un asistente que identifica productos de supermercado o retail a partir de una foto de su empaque o etiqueta.
 Analiza la imagen y devuelve:

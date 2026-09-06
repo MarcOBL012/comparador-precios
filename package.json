@@ -8,6 +8,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.64",
     "ai": "^7.0.0",
     "zod": "^3.25.76"
   },
