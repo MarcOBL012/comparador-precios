@@ -4,7 +4,8 @@ import { verifyToken } from '@clerk/backend';
 export async function isAuthenticated(req: VercelRequest): Promise<boolean> {
   const header = req.headers['authorization'];
   const value = Array.isArray(header) ? header[0] : header;
-  const token = value?.replace(/^Bearer\s+/i, '');
+  const match = value?.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1];
   if (!token) {
     return false;
   }
