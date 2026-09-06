@@ -4,9 +4,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const { handleScanMock } = vi.hoisted(() => ({
   handleScanMock: vi.fn(),
 }));
+const { isAuthenticatedMock } = vi.hoisted(() => ({
+  isAuthenticatedMock: vi.fn(),
+}));
 
 vi.mock('../lib/scanHandler', () => ({
   handleScan: handleScanMock,
+}));
+vi.mock('../lib/auth', () => ({
+  isAuthenticated: isAuthenticatedMock,
 }));
 
 import handler from '../api/scan';
@@ -35,6 +41,8 @@ function createMockReq(method: string, body: unknown): VercelRequest {
 describe('POST /api/scan', () => {
   beforeEach(() => {
     handleScanMock.mockReset();
+    isAuthenticatedMock.mockReset();
+    isAuthenticatedMock.mockResolvedValue(true);
   });
 
   it('responde 405 si el método no es POST', async () => {
@@ -45,6 +53,18 @@ describe('POST /api/scan', () => {
 
     expect(res.statusCode).toBe(405);
     expect(res.body).toEqual({ error: 'Método no permitido. Usa POST.' });
+  });
+
+  it('responde 401 si no está autenticado', async () => {
+    isAuthenticatedMock.mockResolvedValue(false);
+    const req = createMockReq('POST', { image: 'data:image/jpeg;base64,ABC' });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ error: 'No autenticado. Inicia sesión para escanear.' });
+    expect(handleScanMock).not.toHaveBeenCalled();
   });
 
   it('responde 200 con la identificación en éxito', async () => {
