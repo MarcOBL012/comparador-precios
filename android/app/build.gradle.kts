@@ -86,6 +86,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Persistencia local — bandera de onboarding.
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+
     // Permisos: se usa Activity Result API (activity-compose), sin Accompanist.
 
     debugImplementation("androidx.compose.ui:ui-tooling")
