@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 val localProps = Properties()
 val localFile = rootProject.file("local.properties")
@@ -10,6 +11,10 @@ val scanBaseUrl: String =
     (localProps.getProperty("scanBaseUrl"))
         ?: System.getenv("SCAN_BASE_URL")
         ?: "https://tu-backend.vercel.app/"
+val clerkPublishableKey: String =
+    (localProps.getProperty("clerkPublishableKey"))
+        ?: System.getenv("CLERK_PUBLISHABLE_KEY")
+        ?: "pk_test_replace_me"
 
 plugins {
     id("com.android.application")
@@ -20,7 +25,7 @@ plugins {
 
 android {
     namespace = "pe.com.comparadorprecios"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "pe.com.comparadorprecios"
@@ -29,6 +34,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         buildConfigField("String", "SCAN_BASE_URL", "\"$scanBaseUrl\"")
+        buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$clerkPublishableKey\"")
     }
 
     buildTypes {
@@ -44,15 +50,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -63,8 +72,8 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -88,6 +97,10 @@ dependencies {
 
     // Persistencia local — bandera de onboarding.
     implementation("androidx.datastore:datastore-preferences:1.2.1")
+
+    // Auth — Clerk (registro/login + verificación de sesión con el backend).
+    implementation("com.clerk:clerk-android-api:1.1.5")
+    implementation("com.clerk:clerk-android-ui:1.1.5")
 
     // Permisos: se usa Activity Result API (activity-compose), sin Accompanist.
 

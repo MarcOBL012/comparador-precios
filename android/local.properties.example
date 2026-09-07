@@ -1,2 +1,4 @@
 # Copia a local.properties (no se commitea) y ajusta a tu backend desplegado.
 scanBaseUrl=https://tu-backend.vercel.app/
+# Clave publicable de Clerk (Dashboard de Clerk → API Keys → Publishable key).
+clerkPublishableKey=pk_test_reemplaza_esto
