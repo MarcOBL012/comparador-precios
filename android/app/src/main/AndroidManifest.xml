@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".App"
         android:allowBackup="false"
         android:label="Comparador de precios"
         android:supportsRtl="true"
