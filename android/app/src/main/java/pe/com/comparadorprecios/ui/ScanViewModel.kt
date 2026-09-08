@@ -22,6 +22,25 @@ class ScanViewModel(
         _state.value = ScanUiState.Idle
     }
 
+    /**
+     * Cierra sesión desde el estado Unauthorized usando viewModelScope (Activity-scoped,
+     * NO scoped al composable) para que la corrutina de signOut() sobreviva aunque la rama
+     * Unauthorized se recomponga/dispose (p.ej. si algo más resetea el estado mientras tanto).
+     * Colocar el reset a Idle en un `finally` alrededor de una llamada suspend garantiza que
+     * signOut() corra hasta completarse (o falle) antes de limpiar el estado, en vez de que un
+     * reset síncrono cancele la corrutina en su primer punto de suspensión (ver MainActivity).
+     */
+    fun signOutAfterUnauthorized(signOut: suspend () -> Unit) {
+        if (_state.value !is ScanUiState.Unauthorized) return
+        viewModelScope.launch {
+            try {
+                signOut()
+            } finally {
+                _state.value = ScanUiState.Idle
+            }
+        }
+    }
+
     fun scan(imageDataUri: String) {
         if (_state.value is ScanUiState.Loading) return
         _state.value = ScanUiState.Loading

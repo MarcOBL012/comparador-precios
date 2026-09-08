@@ -53,13 +53,35 @@ class MainActivity : ComponentActivity() {
                     // de "de verdad no hay sesión", evitando que un usuario ya logueado vea
                     // brevemente (u offline, indefinidamente) la pantalla de sign-in.
                     val clerkReady by Clerk.isInitialized.collectAsStateWithLifecycle()
+                    // Clerk.initializationError (verificado vía javap: StateFlow<Throwable?>,
+                    // respaldado por ConfigurationManager.getInitializationError()) queda no-null
+                    // cuando la SDK agota sus reintentos automáticos de init (p.ej. instalación
+                    // nueva sin conexión) y loguea que hay que llamar a Clerk.reinitialize()
+                    // manualmente — cosa que la app no hacía, dejando el splash como spinner mudo
+                    // para siempre en ese caso (se autorecupera si vuelve la conexión, gracias al
+                    // monitor de conectividad propio de la SDK, pero no antes).
+                    val clerkInitError by Clerk.initializationError.collectAsStateWithLifecycle()
                     val scope = rememberCoroutineScope()
 
                     // Captura en un val local estable para que el smart-cast de más abajo
                     // no dependa de volver a invocar el getter del delegado `by`.
                     val hasSeenOnboardingSnapshot = hasSeenOnboarding
+
+                    // Onboarding no necesita red ni sesión de Clerk: se muestra apenas DataStore
+                    // confirma que el usuario no lo ha visto, sin esperar a que Clerk termine de
+                    // inicializar (antes quedaba bloqueado detrás de clerkReady también).
+                    if (hasSeenOnboardingSnapshot == false) {
+                        OnboardingScreen(
+                            onContinue = { scope.launch { onboardingPrefs.markOnboardingSeen() } },
+                        )
+                        return@Surface
+                    }
+
                     if (hasSeenOnboardingSnapshot == null || !clerkReady) {
-                        SplashScreen()
+                        SplashScreen(
+                            initializationError = clerkInitError,
+                            onRetry = { Clerk.reinitialize() },
+                        )
                         return@Surface
                     }
 
@@ -89,8 +111,14 @@ class MainActivity : ComponentActivity() {
 
                             // `vm` es Activity-scoped (viewModel {} vive en el ViewModelStore de la
                             // Activity), así que sobrevive a salir/re-entrar de esta rama Scanning
-                            // (p.ej. tras el signOut forzado por Unauthorized más abajo). Defensa
-                            // adicional por si algún otro camino futuro deja Unauthorized colgado.
+                            // (p.ej. tras el signOut forzado por Unauthorized más abajo). Con el
+                            // signOut real ahora corriendo en viewModelScope (ver rama Unauthorized),
+                            // este reset es un no-op inofensivo en el caso normal — para cuando un
+                            // sign-in fresco reentra en Scanning, signOutAfterUnauthorized() ya
+                            // habrá dejado el estado en Idle vía su `finally`. Se mantiene como red
+                            // de seguridad por si algún camino futuro deja Unauthorized colgado; no
+                            // compite con el signOut en curso porque éste vive en viewModelScope,
+                            // independiente de esta composición.
                             LaunchedEffect(vm) {
                                 if (vm.state.value is ScanUiState.Unauthorized) vm.reset()
                             }
@@ -112,19 +140,21 @@ class MainActivity : ComponentActivity() {
                                     // Clerk.signOut() no existe; el signOut real vive en Clerk.auth
                                     // (com.clerk.api.auth.Auth#signOut), verificado vía javap.
                                     //
-                                    // vm.reset() va ANTES de signOut() (que es suspend y hace red):
-                                    // este composable puede ser disposed en cuanto userFlow emite
-                                    // null, lo que cancelaría la corrutina a mitad de camino y
-                                    // saltaría un reset colocado después. Puesto antes, el reset
-                                    // corre síncronamente y siempre se aplica.
-                                    //
-                                    // Si signOut() falla, userFlow sigue no-nulo y esta rama
-                                    // Scanning se vuelve a componer, pero ahora con un VM ya en
-                                    // Idle (por el reset de arriba) en vez de quedar atascada en
-                                    // Unauthorized reintentando signOut() en bucle.
+                                    // La secuencia signOut()→reset() vive en el ViewModel
+                                    // (viewModelScope, Activity-scoped) en vez de en este
+                                    // LaunchedEffect (composable-scoped): si el reset ocurriera
+                                    // síncronamente ANTES de signOut() (como en un intento previo),
+                                    // el propio cambio de estado a Idle dispara la recomposición que
+                                    // saca de esta rama Unauthorized, lo que hace dispose de este
+                                    // LaunchedEffect y cancela signOut() en su primer punto de
+                                    // suspensión — dejando al usuario sin cerrar sesión realmente
+                                    // (ni local ni en el servidor de Clerk). Con
+                                    // signOutAfterUnauthorized(), signOut() corre en
+                                    // viewModelScope, que sobrevive a la recomposición/dispose de
+                                    // este composable, y el reset a Idle solo ocurre en el
+                                    // `finally` una vez signOut() termina (éxito o falla).
                                     LaunchedEffect(Unit) {
-                                        vm.reset()
-                                        Clerk.auth.signOut()
+                                        vm.signOutAfterUnauthorized { Clerk.auth.signOut() }
                                     }
                                     SigningOutScreen(message = s.message)
                                 }

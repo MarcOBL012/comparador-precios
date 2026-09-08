@@ -55,15 +55,36 @@ fun LoadingScreen() {
  * Splash genérico para el arranque en frío: se muestra mientras Clerk
  * termina su inicialización async y/o DataStore no ha leído aún si el
  * usuario ya vio el onboarding (evita el flicker Onboarding→Auth→Scanning).
+ *
+ * Si Clerk.initializationError (verificado vía javap: StateFlow<Throwable?>,
+ * respaldado por ConfigurationManager) trae un error — p.ej. instalación nueva
+ * sin conexión, donde la SDK loguea "Initialization failed permanently. Call
+ * Clerk.reinitialize() to retry manually." y nunca vuelve a intentarlo por su
+ * cuenta hasta que algo dispare una reconexión — se muestra un mensaje y un
+ * botón de reintento en vez de un spinner mudo indefinido.
  */
 @Composable
-fun SplashScreen() {
+fun SplashScreen(
+    initializationError: Throwable? = null,
+    onRetry: (() -> Unit)? = null,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator()
+        if (initializationError != null) {
+            Text(
+                "No se pudo conectar. Revisa tu internet.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (onRetry != null) {
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = onRetry) { Text("Reintentar") }
+            }
+        } else {
+            CircularProgressIndicator()
+        }
     }
 }
 
