@@ -51,6 +51,59 @@ fun LoadingScreen() {
     }
 }
 
+/**
+ * Splash genérico para el arranque en frío: se muestra mientras Clerk
+ * termina su inicialización async y/o DataStore no ha leído aún si el
+ * usuario ya vio el onboarding (evita el flicker Onboarding→Auth→Scanning).
+ *
+ * Si Clerk.initializationError (verificado vía javap: StateFlow<Throwable?>,
+ * respaldado por ConfigurationManager) trae un error se muestra un mensaje y un
+ * botón de reintento en vez de un spinner mudo indefinido. Nota: la SDK ya
+ * reintenta sola varias veces con backoff (5s/10s/20s) antes de rendirse, y su
+ * propio monitor de conectividad puede reintentar de nuevo más tarde por su
+ * cuenta — este error puede aparecer y desaparecer solo mientras tanto; el
+ * botón de reintento (Clerk.reinitialize()) es un empujón manual adicional,
+ * no la única vía de recuperación.
+ */
+@Composable
+fun SplashScreen(
+    initializationError: Throwable? = null,
+    onRetry: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (initializationError != null) {
+            Text(
+                "No se pudo conectar. Revisa tu internet.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (onRetry != null) {
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = onRetry) { Text("Reintentar") }
+            }
+        } else {
+            CircularProgressIndicator()
+        }
+    }
+}
+
+/** Se muestra brevemente mientras se cierra la sesión tras un 401 (ver ScanUiState.Unauthorized). */
+@Composable
+fun SigningOutScreen(message: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+        Spacer(Modifier.height(16.dp))
+        Text(message)
+    }
+}
+
 @Composable
 fun ErrorScreen(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
     Column(

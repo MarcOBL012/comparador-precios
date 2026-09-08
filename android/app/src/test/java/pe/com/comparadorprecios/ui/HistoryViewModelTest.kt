@@ -1,5 +1,6 @@
 package pe.com.comparadorprecios.ui
 
+import android.app.Application
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -18,13 +19,18 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import pe.com.comparadorprecios.data.Identification
 import pe.com.comparadorprecios.data.StoreResult
 import pe.com.comparadorprecios.history.AppDatabase
 import pe.com.comparadorprecios.history.HistoryRepository
 
+// application = Application::class evita que Robolectric instancie nuestra App real (que
+// llama a Clerk.initialize(...) en onCreate) — este test solo ejercita el ViewModel de
+// historial local y no necesita (ni debe depender de) que Clerk esté inicializado.
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class)
 class HistoryViewModelTest {
 
     @get:Rule

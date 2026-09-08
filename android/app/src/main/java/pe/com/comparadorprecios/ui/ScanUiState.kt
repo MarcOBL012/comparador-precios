@@ -8,6 +8,11 @@ sealed interface ScanUiState {
     data object Idle : ScanUiState
     data object Loading : ScanUiState
 
+    /** El mensaje viene de ScanError.Unauthorized (ScanRepository) para mostrarlo antes de cerrar sesión. */
+    data class Unauthorized(
+        val message: String = "Tu sesión expiró. Inicia sesión de nuevo.",
+    ) : ScanUiState
+
     /** confianza < 0.5 → el backend devolvió tiendas: []. Reintentar o ingreso manual. */
     data class LowConfidence(val identification: Identification) : ScanUiState
 

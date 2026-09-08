@@ -1,5 +1,6 @@
 package pe.com.comparadorprecios.history
 
+import android.app.Application
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
@@ -12,10 +13,15 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import pe.com.comparadorprecios.data.Identification
 import pe.com.comparadorprecios.data.StoreResult
 
+// application = Application::class evita que Robolectric instancie nuestra App real (que
+// llama a Clerk.initialize(...) en onCreate) — este test solo ejercita Room y no necesita
+// (ni debe depender de) que Clerk esté inicializado con una clave válida.
 @RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class)
 class HistoryRepositoryTest {
 
     private lateinit var db: AppDatabase

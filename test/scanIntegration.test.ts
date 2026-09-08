@@ -4,10 +4,16 @@ const { generateTextMock, objectMock } = vi.hoisted(() => ({
   generateTextMock: vi.fn(),
   objectMock: vi.fn((config: unknown) => ({ __schemaConfig: config })),
 }));
+const { isAuthenticatedMock } = vi.hoisted(() => ({
+  isAuthenticatedMock: vi.fn(),
+}));
 
 vi.mock('ai', () => ({
   generateText: generateTextMock,
   Output: { object: objectMock },
+}));
+vi.mock('../lib/auth', () => ({
+  isAuthenticated: isAuthenticatedMock,
 }));
 
 import handler from '../api/scan';
@@ -43,6 +49,8 @@ describe('POST /api/scan (integración completa: scanHandler, identifyProduct y 
   beforeEach(() => {
     generateTextMock.mockReset();
     fetchMock.mockReset();
+    isAuthenticatedMock.mockReset();
+    isAuthenticatedMock.mockResolvedValue(true);
     vi.stubGlobal('fetch', fetchMock);
   });
 

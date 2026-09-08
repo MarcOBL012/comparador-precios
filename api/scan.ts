@@ -1,12 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleScan } from '../lib/scanHandler.js';
 import { ValidationError, IdentificationError } from '../lib/errors.js';
+import { isAuthenticated } from '../lib/auth.js';
 
 export const maxDuration = 60;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método no permitido. Usa POST.' });
+    return;
+  }
+
+  if (!(await isAuthenticated(req))) {
+    res.status(401).json({ error: 'No autenticado. Inicia sesión para escanear.' });
     return;
   }
 

@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 val localProps = Properties()
 val localFile = rootProject.file("local.properties")
@@ -10,18 +11,22 @@ val scanBaseUrl: String =
     (localProps.getProperty("scanBaseUrl"))
         ?: System.getenv("SCAN_BASE_URL")
         ?: "https://tu-backend.vercel.app/"
+val clerkPublishableKey: String =
+    (localProps.getProperty("clerkPublishableKey"))
+        ?: System.getenv("CLERK_PUBLISHABLE_KEY")
+        ?: "pk_test_replace_me"
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
     namespace = "pe.com.comparadorprecios"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "pe.com.comparadorprecios"
@@ -30,6 +35,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         buildConfigField("String", "SCAN_BASE_URL", "\"$scanBaseUrl\"")
+        buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$clerkPublishableKey\"")
     }
 
     buildTypes {
@@ -45,9 +51,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -57,6 +60,21 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+// Room 2.8.4's annotation processor pulls kotlin-metadata-jvm transitively, but the version
+// it resolves by default can't read metadata produced by Kotlin 2.4.0 (required by Clerk) —
+// confirmed via a real kapt failure: "Provided Metadata instance has version 2.4.0, while
+// maximum supported version is 2.3.0". kotlin-metadata-jvm 2.4.10 (released alongside Kotlin
+// 2.4.10) does support it, so force it on kapt's classpath specifically.
+configurations.matching { it.name.contains("kapt", ignoreCase = true) }.configureEach {
+    resolutionStrategy.force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.10.00")
     implementation(composeBom)
@@ -64,8 +82,8 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -89,9 +107,16 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // Historial local — Room (solo dispositivo, sin nube).
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    kapt("androidx.room:room-compiler:2.8.4")
+
+    // Persistencia local — bandera de onboarding.
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+
+    // Auth — Clerk (registro/login + verificación de sesión con el backend).
+    implementation("com.clerk:clerk-android-api:1.1.5")
+    implementation("com.clerk:clerk-android-ui:1.1.5")
 
     // Permisos: se usa Activity Result API (activity-compose), sin Accompanist.
 
@@ -103,7 +128,7 @@ dependencies {
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("org.mockito:mockito-core:5.11.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.3.1")
-    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("androidx.room:room-testing:2.8.4")
     testImplementation("androidx.test:core:1.5.0")
     testImplementation("org.robolectric:robolectric:4.13")
 }
