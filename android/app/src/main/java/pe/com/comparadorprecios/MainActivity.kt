@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
@@ -22,11 +24,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.room.Room
 import pe.com.comparadorprecios.data.RetrofitProvider
 import pe.com.comparadorprecios.data.ScanRepository
+import pe.com.comparadorprecios.history.AppDatabase
+import pe.com.comparadorprecios.history.HistoryRepository
 import pe.com.comparadorprecios.ui.AppBottomBar
 import pe.com.comparadorprecios.ui.AppRoutes
+import pe.com.comparadorprecios.ui.DetailScreen
+import pe.com.comparadorprecios.ui.DetailViewModel
 import pe.com.comparadorprecios.ui.ErrorScreen
+import pe.com.comparadorprecios.ui.HistoryScreen
+import pe.com.comparadorprecios.ui.HistoryViewModel
 import pe.com.comparadorprecios.ui.LoadingScreen
 import pe.com.comparadorprecios.ui.LowConfidenceScreen
 import pe.com.comparadorprecios.ui.ResultScreen
@@ -50,10 +59,20 @@ class MainActivity : ComponentActivity() {
                             )
                         )
                     }
+                    val historyRepository = remember {
+                        val db = Room.databaseBuilder(
+                            context.applicationContext,
+                            AppDatabase::class.java,
+                            "comparador-precios.db",
+                        ).build()
+                        HistoryRepository(db.historyDao())
+                    }
                     val vm: ScanViewModel = viewModel { ScanViewModel(repository) }
                     val navController = rememberNavController()
+                    val snackbar = remember { SnackbarHostState() }
                     Scaffold(
                         bottomBar = { AppBottomBar(navController) },
+                        snackbarHost = { SnackbarHost(snackbar) },
                     ) { padding ->
                         NavHost(
                             navController = navController,
@@ -98,13 +117,26 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             composable(AppRoutes.HISTORY) {
-                                Text("Historial (Task 5)")
+                                val historyVm: HistoryViewModel = viewModel { HistoryViewModel(historyRepository) }
+                                HistoryScreen(
+                                    viewModel = historyVm,
+                                    snackbar = snackbar,
+                                    onOpen = { id -> navController.navigate(AppRoutes.detailRoute(id)) },
+                                )
                             }
                             composable(
                                 route = AppRoutes.DETAIL,
                                 arguments = listOf(navArgument(AppRoutes.DETAIL_ARG) { type = NavType.LongType }),
-                            ) {
-                                Text("Detalle (Task 5)")
+                            ) { backStackEntry ->
+                                val scanId = backStackEntry.arguments?.getLong(AppRoutes.DETAIL_ARG) ?: return@composable
+                                val detailVm: DetailViewModel = viewModel { DetailViewModel(historyRepository, scanId) }
+                                val item by detailVm.item.collectAsState()
+                                val loaded = item
+                                if (loaded != null) {
+                                    DetailScreen(item = loaded, onBack = { navController.popBackStack() })
+                                } else {
+                                    LoadingScreen()
+                                }
                             }
                         }
                     }
