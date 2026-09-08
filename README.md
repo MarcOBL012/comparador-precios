@@ -103,4 +103,4 @@ Ningún secreto (API keys, tokens) está commiteado en este repositorio — `.en
 
 ## Documentación adicional
 
-`docs/superpowers/specs/` y `docs/superpowers/plans/` contienen el diseño y los planes de implementación originales del proyecto (identificación visual, scrapers de precios, autenticación y onboarding).
+`android/README.md` documenta el contrato exacto con el backend, la configuración local y el historial de escaneos.

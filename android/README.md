@@ -2,7 +2,9 @@
 
 App nativa (Kotlin + Compose + CameraX + Retrofit) contra `POST /api/scan` del backend (Planes 1+2).
 
-## Contrato que respeta (ver `../HANDOFF-PLAN3.md`)
+## Contrato del backend
+
+- `POST {SCAN_BASE_URL}/api/scan` con `{ "image": "data:image/jpeg;base64,..." }` y header `Authorization: Bearer <token de Clerk>`.
 
 - `POST {SCAN_BASE_URL}/api/scan` con `{ "image": "data:image/jpeg;base64,..." }`.
 - Base64 con **`NO_WRAP`** (nunca `DEFAULT`).
@@ -13,10 +15,10 @@ App nativa (Kotlin + Compose + CameraX + Retrofit) contra `POST /api/scan` del b
 
 ## Configurar
 
-1. Abrir **esta carpeta `android/`** en Android Studio (no la raíz del repo). Dejar que sincronice Gradle (descarga AGP 8.5.2 + SDK 34).
-2. Copiar `local.properties.example` → `local.properties` y poner tu URL:
+1. Abrir **esta carpeta `android/`** en Android Studio (no la raíz del repo). Dejar que sincronice Gradle (descarga AGP 8.5.2 + SDK 36).
+2. Copiar `local.properties.example` → `local.properties` y completar tu URL y tu clave publicable de Clerk:
    `scanBaseUrl=https://<tu-app>.vercel.app/` (o exportar `SCAN_BASE_URL`).
-   Sin esto apunta a `https://tu-backend.vercel.app/` (placeholder).
+   `clerkPublishableKey=pk_test_...` (Dashboard de Clerk → API Keys). Sin esto, el backend responde 401.
 3. `Run > app` en un dispositivo físico (la cámara del emulador no sirve para fotos reales).
 
 ## Tests
@@ -37,4 +39,4 @@ App nativa (Kotlin + Compose + CameraX + Retrofit) contra `POST /api/scan` del b
 - `data/` — `ScanModels.kt` (contrato), `ScanApi.kt` (Retrofit, timeouts 60s por `maxDuration = 60` del backend), `ScanRepository.kt` (mapeo 400/502/500 → `ScanError`).
 - `util/` — `DataUri.kt` (puro JVM: formato + límite), `ImageEncoding.kt` (compresión + `NO_WRAP`), `PriceSorting.kt` (encontrados por precio asc, luego resto).
 - `ui/` — `ScanUiState.kt`, `ScanViewModel.kt`, `ScanScreen.kt` (CameraX puntual), `Screens.kt` (carga, resultados, baja confianza, error).
-- `MainActivity.kt` — máquina de estados sin NavHost (MVP: 1 flujo lineal).
+- `MainActivity.kt` — NavHost (`scan` | `history` | `detail`) + barra inferior; el flujo de escaneo vive en el destino `scan`.
