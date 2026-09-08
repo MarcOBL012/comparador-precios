@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 is ScanUiState.Loading -> LoadingScreen()
+                                is ScanUiState.Unauthorized -> {
+                                    // Clerk.signOut() no existe; el signOut real vive en Clerk.auth
+                                    // (com.clerk.api.auth.Auth#signOut), verificado vía javap.
+                                    LaunchedEffect(Unit) { Clerk.auth.signOut() }
+                                    LoadingScreen()
+                                }
                                 is ScanUiState.LowConfidence -> LowConfidenceScreen(
                                     identification = s.identification,
                                     manualName = manualName,

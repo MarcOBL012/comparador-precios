@@ -36,6 +36,8 @@ class ScanViewModel(
                         tiendas = PriceSorting.sortForDisplay(response.tiendas),
                     )
                 }
+            } catch (e: ScanError.Unauthorized) {
+                _state.value = ScanUiState.Unauthorized
             } catch (e: ScanError.Validation) {
                 _state.value = ScanUiState.Error(
                     e.message ?: "La imagen no es válida. Toma otra foto."
