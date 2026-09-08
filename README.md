@@ -28,7 +28,6 @@ api/, lib/           Backend (funciones serverless de Vercel, TypeScript)
 | `lib/` | Lógica del backend: identificación con IA, scrapers, matching de productos, autenticación |
 | `test/` | Tests del backend (Vitest) |
 | `scripts/` | Scripts auxiliares (verificación manual de los scrapers) |
-| `docs/` | Documentación de diseño y planes de implementación del proyecto |
 
 ## Requisitos previos
 
