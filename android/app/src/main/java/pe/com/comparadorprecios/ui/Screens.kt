@@ -57,11 +57,13 @@ fun LoadingScreen() {
  * usuario ya vio el onboarding (evita el flicker Onboarding→Auth→Scanning).
  *
  * Si Clerk.initializationError (verificado vía javap: StateFlow<Throwable?>,
- * respaldado por ConfigurationManager) trae un error — p.ej. instalación nueva
- * sin conexión, donde la SDK loguea "Initialization failed permanently. Call
- * Clerk.reinitialize() to retry manually." y nunca vuelve a intentarlo por su
- * cuenta hasta que algo dispare una reconexión — se muestra un mensaje y un
- * botón de reintento en vez de un spinner mudo indefinido.
+ * respaldado por ConfigurationManager) trae un error se muestra un mensaje y un
+ * botón de reintento en vez de un spinner mudo indefinido. Nota: la SDK ya
+ * reintenta sola varias veces con backoff (5s/10s/20s) antes de rendirse, y su
+ * propio monitor de conectividad puede reintentar de nuevo más tarde por su
+ * cuenta — este error puede aparecer y desaparecer solo mientras tanto; el
+ * botón de reintento (Clerk.reinitialize()) es un empujón manual adicional,
+ * no la única vía de recuperación.
  */
 @Composable
 fun SplashScreen(

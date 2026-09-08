@@ -55,11 +55,12 @@ class MainActivity : ComponentActivity() {
                     val clerkReady by Clerk.isInitialized.collectAsStateWithLifecycle()
                     // Clerk.initializationError (verificado vía javap: StateFlow<Throwable?>,
                     // respaldado por ConfigurationManager.getInitializationError()) queda no-null
-                    // cuando la SDK agota sus reintentos automáticos de init (p.ej. instalación
-                    // nueva sin conexión) y loguea que hay que llamar a Clerk.reinitialize()
-                    // manualmente — cosa que la app no hacía, dejando el splash como spinner mudo
-                    // para siempre en ese caso (se autorecupera si vuelve la conexión, gracias al
-                    // monitor de conectividad propio de la SDK, pero no antes).
+                    // en cualquier intento de init fallido sin cliente/entorno en caché — la SDK
+                    // ya reintenta sola con backoff (5s/10s/20s) y su monitor de conectividad puede
+                    // reintentar más tarde por su cuenta, así que este error puede aparecer y
+                    // desaparecer solo; mostrarlo (con un botón que llama a Clerk.reinitialize()
+                    // como empujón manual) evita que la app se quede como spinner mudo mientras
+                    // tanto, en vez de ser la única vía de recuperación.
                     val clerkInitError by Clerk.initializationError.collectAsStateWithLifecycle()
                     val scope = rememberCoroutineScope()
 
@@ -91,6 +92,10 @@ class MainActivity : ComponentActivity() {
                     )
 
                     when (flowState) {
+                        // Inalcanzable en la práctica: al llegar aquí hasSeenOnboardingSnapshot ya
+                        // es `true` (el `false` y el `null` retornan antes, arriba), así que
+                        // AppFlowState.from() nunca devuelve Onboarding en este punto. Se mantiene
+                        // la rama por exhaustividad del `when` sellado y como red de seguridad.
                         AppFlowState.Onboarding -> OnboardingScreen(
                             onContinue = { scope.launch { onboardingPrefs.markOnboardingSeen() } },
                         )
@@ -109,19 +114,14 @@ class MainActivity : ComponentActivity() {
                             var captureError by remember { mutableStateOf<String?>(null) }
                             var manualName by remember { mutableStateOf("") }
 
-                            // `vm` es Activity-scoped (viewModel {} vive en el ViewModelStore de la
-                            // Activity), así que sobrevive a salir/re-entrar de esta rama Scanning
-                            // (p.ej. tras el signOut forzado por Unauthorized más abajo). Con el
-                            // signOut real ahora corriendo en viewModelScope (ver rama Unauthorized),
-                            // este reset es un no-op inofensivo en el caso normal — para cuando un
-                            // sign-in fresco reentra en Scanning, signOutAfterUnauthorized() ya
-                            // habrá dejado el estado en Idle vía su `finally`. Se mantiene como red
-                            // de seguridad por si algún camino futuro deja Unauthorized colgado; no
-                            // compite con el signOut en curso porque éste vive en viewModelScope,
-                            // independiente de esta composición.
-                            LaunchedEffect(vm) {
-                                if (vm.state.value is ScanUiState.Unauthorized) vm.reset()
-                            }
+                            // Nota: no hay un reset defensivo aquí a propósito. `vm` es
+                            // Activity-scoped y signOutAfterUnauthorized() (ver rama Unauthorized)
+                            // corre en viewModelScope con un `finally` que garantiza sacar el estado
+                            // de Unauthorized en cuanto signOut() termina, sin depender de esta
+                            // composición. Un reset extra aquí competiría con eso: en una
+                            // recreación de Activity (p.ej. rotación) mientras el signOut sigue en
+                            // vuelo, resetear a Idle antes de que termine haría parpadear la
+                            // pantalla de escaneo en vez de "Cerrando sesión…".
 
                             when (val s = state) {
                                 is ScanUiState.Idle -> {

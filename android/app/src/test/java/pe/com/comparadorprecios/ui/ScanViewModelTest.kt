@@ -3,6 +3,7 @@ package pe.com.comparadorprecios.ui
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -136,6 +137,10 @@ class ScanViewModelTest {
         // Regresión: mover signOut()+reset() a viewModelScope (en vez de un LaunchedEffect que
         // puede ser disposed por un reset síncrono previo) es lo que garantiza que signOut()
         // realmente corra hasta el final antes de limpiar el estado.
+        //
+        // Este test debe fallar si el orden vuelve a ser reset() -> launch { signOut() }: por eso
+        // signOut() aquí hace delay() antes de completar, y verificamos que el estado SIGUE siendo
+        // Unauthorized mientras signOut está en vuelo, y solo pasa a Idle después de que termina.
         whenever(repository.scan("uri")).thenThrow(
             ScanError.Unauthorized("Tu sesión expiró. Inicia sesión de nuevo.")
         )
@@ -146,8 +151,14 @@ class ScanViewModelTest {
 
         var signOutInvoked = false
         vm.signOutAfterUnauthorized {
+            delay(1_000)
             signOutInvoked = true
         }
+
+        dispatcher.scheduler.advanceTimeBy(500)
+        assertTrue(!signOutInvoked)
+        assertTrue("el estado no debe resetearse antes de que signOut() termine", vm.state.value is ScanUiState.Unauthorized)
+
         dispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(signOutInvoked)
