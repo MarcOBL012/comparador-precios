@@ -51,6 +51,36 @@ fun LoadingScreen() {
     }
 }
 
+/**
+ * Splash genérico para el arranque en frío: se muestra mientras Clerk
+ * termina su inicialización async y/o DataStore no ha leído aún si el
+ * usuario ya vio el onboarding (evita el flicker Onboarding→Auth→Scanning).
+ */
+@Composable
+fun SplashScreen() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+/** Se muestra brevemente mientras se cierra la sesión tras un 401 (ver ScanUiState.Unauthorized). */
+@Composable
+fun SigningOutScreen(message: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+        Spacer(Modifier.height(16.dp))
+        Text(message)
+    }
+}
+
 @Composable
 fun ErrorScreen(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
     Column(

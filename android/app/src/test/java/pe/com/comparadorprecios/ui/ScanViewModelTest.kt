@@ -95,4 +95,39 @@ class ScanViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
         assertTrue(vm.state.value is ScanUiState.Error)
     }
+
+    @Test
+    fun `error 401 produce Unauthorized con mensaje`() = runTest(dispatcher) {
+        whenever(repository.scan("uri")).thenThrow(
+            ScanError.Unauthorized("Tu sesión expiró. Inicia sesión de nuevo.")
+        )
+        val vm = ScanViewModel(repository)
+        vm.scan("uri")
+        dispatcher.scheduler.advanceUntilIdle()
+        val state = vm.state.value
+        assertTrue(state is ScanUiState.Unauthorized)
+        assertEquals(
+            "Tu sesión expiró. Inicia sesión de nuevo.",
+            (state as ScanUiState.Unauthorized).message,
+        )
+    }
+
+    @Test
+    fun `reset limpia un estado Unauthorized de vuelta a Idle`() = runTest(dispatcher) {
+        // Regresión: MainActivity re-usa el mismo ScanViewModel (Activity-scoped) al
+        // salir/re-entrar de la rama Scanning tras un signOut forzado por 401. Si reset()
+        // no limpiara Unauthorized, el usuario quedaría en un bucle permanente de
+        // signOut al volver a iniciar sesión.
+        whenever(repository.scan("uri")).thenThrow(
+            ScanError.Unauthorized("Tu sesión expiró. Inicia sesión de nuevo.")
+        )
+        val vm = ScanViewModel(repository)
+        vm.scan("uri")
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.state.value is ScanUiState.Unauthorized)
+
+        vm.reset()
+
+        assertEquals(ScanUiState.Idle, vm.state.value)
+    }
 }

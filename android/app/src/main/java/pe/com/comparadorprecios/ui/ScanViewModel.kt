@@ -37,7 +37,9 @@ class ScanViewModel(
                     )
                 }
             } catch (e: ScanError.Unauthorized) {
-                _state.value = ScanUiState.Unauthorized
+                _state.value = ScanUiState.Unauthorized(
+                    e.message ?: "Tu sesión expiró. Inicia sesión de nuevo."
+                )
             } catch (e: ScanError.Validation) {
                 _state.value = ScanUiState.Error(
                     e.message ?: "La imagen no es válida. Toma otra foto."

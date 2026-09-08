@@ -12,6 +12,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.http.Body
 import retrofit2.http.POST
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /** Único endpoint del backend (Planes 1+2). */
@@ -37,10 +38,19 @@ object RetrofitProvider {
             // La API real (verificada contra el .aar en el cache de Gradle vía javap) es
             // Auth.getToken(options): ClerkResult<String, ClerkErrorResponse>, expuesta como
             // Clerk.auth.getToken() — hay que desenvolver el ClerkResult.
+            //
+            // Un ClerkResult.Failure aquí es un error real de red/API al refrescar el token,
+            // no "el usuario no tiene sesión" — si lo tratáramos igual que "sin token" la
+            // request saldría sin Authorization, el backend respondería 401, y eso dispararía
+            // un signOut real por un simple hipo de red. Lanzar IOException deja que
+            // ScanRepository lo mapee a ScanError.Network (su catch (e: IOException) ya
+            // existente), en vez de a un 401/Unauthorized.
             val token = runBlocking {
                 when (val result = Clerk.auth.getToken()) {
                     is ClerkResult.Success -> result.value
-                    else -> null
+                    is ClerkResult.Failure -> throw IOException(
+                        "No se pudo obtener el token de sesión.", result.throwable
+                    )
                 }
             }
             val request = if (token != null) {

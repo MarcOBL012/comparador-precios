@@ -32,6 +32,8 @@ import pe.com.comparadorprecios.ui.ResultScreen
 import pe.com.comparadorprecios.ui.ScanScreen
 import pe.com.comparadorprecios.ui.ScanUiState
 import pe.com.comparadorprecios.ui.ScanViewModel
+import pe.com.comparadorprecios.ui.SigningOutScreen
+import pe.com.comparadorprecios.ui.SplashScreen
 import pe.com.comparadorprecios.ui.openWebSearch
 
 class MainActivity : ComponentActivity() {
@@ -42,12 +44,27 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val context = LocalContext.current
                     val onboardingPrefs = remember { OnboardingPreferences(context) }
-                    val hasSeenOnboarding by onboardingPrefs.hasSeenOnboarding.collectAsState(initial = false)
+                    // initial = null: distingue "DataStore no ha hecho su primera lectura todavía"
+                    // de "false, no ha visto el onboarding" (evita el flicker de cold-start).
+                    val hasSeenOnboarding by onboardingPrefs.hasSeenOnboarding.collectAsState(initial = null)
                     val user by Clerk.userFlow.collectAsStateWithLifecycle()
+                    // Clerk.userFlow arranca en null antes de que Clerk termine su init async
+                    // (con llamada de red incluida); isInitialized distingue ese estado transitorio
+                    // de "de verdad no hay sesión", evitando que un usuario ya logueado vea
+                    // brevemente (u offline, indefinidamente) la pantalla de sign-in.
+                    val clerkReady by Clerk.isInitialized.collectAsStateWithLifecycle()
                     val scope = rememberCoroutineScope()
 
+                    // Captura en un val local estable para que el smart-cast de más abajo
+                    // no dependa de volver a invocar el getter del delegado `by`.
+                    val hasSeenOnboardingSnapshot = hasSeenOnboarding
+                    if (hasSeenOnboardingSnapshot == null || !clerkReady) {
+                        SplashScreen()
+                        return@Surface
+                    }
+
                     val flowState = AppFlowState.from(
-                        hasSeenOnboarding = hasSeenOnboarding,
+                        hasSeenOnboarding = hasSeenOnboardingSnapshot,
                         isSignedIn = user != null,
                     )
 
@@ -70,6 +87,14 @@ class MainActivity : ComponentActivity() {
                             var captureError by remember { mutableStateOf<String?>(null) }
                             var manualName by remember { mutableStateOf("") }
 
+                            // `vm` es Activity-scoped (viewModel {} vive en el ViewModelStore de la
+                            // Activity), así que sobrevive a salir/re-entrar de esta rama Scanning
+                            // (p.ej. tras el signOut forzado por Unauthorized más abajo). Defensa
+                            // adicional por si algún otro camino futuro deja Unauthorized colgado.
+                            LaunchedEffect(vm) {
+                                if (vm.state.value is ScanUiState.Unauthorized) vm.reset()
+                            }
+
                             when (val s = state) {
                                 is ScanUiState.Idle -> {
                                     val err = captureError
@@ -86,8 +111,22 @@ class MainActivity : ComponentActivity() {
                                 is ScanUiState.Unauthorized -> {
                                     // Clerk.signOut() no existe; el signOut real vive en Clerk.auth
                                     // (com.clerk.api.auth.Auth#signOut), verificado vía javap.
-                                    LaunchedEffect(Unit) { Clerk.auth.signOut() }
-                                    LoadingScreen()
+                                    //
+                                    // vm.reset() va ANTES de signOut() (que es suspend y hace red):
+                                    // este composable puede ser disposed en cuanto userFlow emite
+                                    // null, lo que cancelaría la corrutina a mitad de camino y
+                                    // saltaría un reset colocado después. Puesto antes, el reset
+                                    // corre síncronamente y siempre se aplica.
+                                    //
+                                    // Si signOut() falla, userFlow sigue no-nulo y esta rama
+                                    // Scanning se vuelve a componer, pero ahora con un VM ya en
+                                    // Idle (por el reset de arriba) en vez de quedar atascada en
+                                    // Unauthorized reintentando signOut() en bucle.
+                                    LaunchedEffect(Unit) {
+                                        vm.reset()
+                                        Clerk.auth.signOut()
+                                    }
+                                    SigningOutScreen(message = s.message)
                                 }
                                 is ScanUiState.LowConfidence -> LowConfidenceScreen(
                                     identification = s.identification,
