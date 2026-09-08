@@ -35,7 +35,9 @@ describe('isAuthenticated', () => {
   });
 
   it('devuelve true si el token es válido', async () => {
-    verifyTokenMock.mockResolvedValue({ data: { sub: 'user_123' }, errors: null });
+    // El verifyToken real (legacy return de @clerk/backend) resuelve con un JwtPayload
+    // plano en éxito — sin campo `errors` — y lanza en falla (ver el test de abajo).
+    verifyTokenMock.mockResolvedValue({ sub: 'user_123' });
 
     const result = await isAuthenticated(createMockReq('Bearer token-valido'));
 
@@ -44,21 +46,13 @@ describe('isAuthenticated', () => {
   });
 
   it('usa el primer valor si el header llega como array', async () => {
-    verifyTokenMock.mockResolvedValue({ data: { sub: 'user_123' }, errors: null });
+    verifyTokenMock.mockResolvedValue({ sub: 'user_123' });
     const req = { headers: { authorization: ['Bearer token-valido', 'Bearer otro'] } } as unknown as import('@vercel/node').VercelRequest;
 
     const result = await isAuthenticated(req);
 
     expect(result).toBe(true);
     expect(verifyTokenMock).toHaveBeenCalledWith('token-valido', { secretKey: process.env.CLERK_SECRET_KEY });
-  });
-
-  it('devuelve false si verifyToken resuelve con errores', async () => {
-    verifyTokenMock.mockResolvedValue({ data: null, errors: [{ message: 'inválido' }] });
-
-    const result = await isAuthenticated(createMockReq('Bearer token-invalido'));
-
-    expect(result).toBe(false);
   });
 
   it('devuelve false si verifyToken lanza una excepción', async () => {

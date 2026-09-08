@@ -10,8 +10,13 @@ export async function isAuthenticated(req: VercelRequest): Promise<boolean> {
     return false;
   }
   try {
-    const result = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
-    return !result.errors;
+    // La wrapper de "legacy return" de verifyToken resuelve con un JwtPayload plano en
+    // éxito y lanza TokenVerificationError en falla — nunca resuelve con un campo
+    // `.errors`. JwtPayload tiene index signature ([k: string]: unknown), así que
+    // `result.errors` tipaba como `unknown` sin que tsc lo detectara, aunque ese campo
+    // nunca puede estar presente en la práctica.
+    await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
+    return true;
   } catch {
     return false;
   }
