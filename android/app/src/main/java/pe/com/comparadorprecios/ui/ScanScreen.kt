@@ -15,7 +15,10 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,17 +75,16 @@ fun ScanScreen(onImageCaptured: (dataUri: String) -> Unit, onError: (String) -> 
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-        Button(
+        ExtendedFloatingActionButton(
             onClick = {
-                if (capturing) return@Button
+                if (capturing) return@ExtendedFloatingActionButton
                 capturing = true
                 capturePhoto(context, imageCapture, onImageCaptured, onError) { capturing = false }
             },
             modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
-            enabled = !capturing,
-        ) {
-            Text(if (capturing) "Capturando…" else "Escanear producto")
-        }
+            icon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
+            text = { Text(if (capturing) "Capturando…" else "Escanear producto") },
+        )
     }
 }
 

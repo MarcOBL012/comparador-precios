@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -85,7 +85,7 @@ fun ResultScreen(
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
             "${identification.marca} ${identification.nombre} ${identification.presentacion}".trim(),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         Text(
@@ -117,7 +117,7 @@ fun ResultScreen(
 
 @Composable
 private fun StoreRow(result: StoreResult, onOpenUrl: (String) -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -127,7 +127,9 @@ private fun StoreRow(result: StoreResult, onOpenUrl: (String) -> Unit) {
                 when (result.estado) {
                     "encontrado" -> Text(
                         soles.format(result.precio ?: 0.0),
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     "no_encontrado" -> Text("no disponible")
                     else -> Text("error")
