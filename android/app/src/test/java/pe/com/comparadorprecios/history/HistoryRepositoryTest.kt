@@ -82,4 +82,18 @@ class HistoryRepositoryTest {
     fun `get devuelve null para id inexistente`() = runTest {
         assertNull(repo.get(9999L))
     }
+
+    @Test
+    fun `save con precio null deja bestPrice en null`() = runTest {
+        repo.save(
+            identification,
+            listOf(StoreResult("Wong", "encontrado", "Prod", null, null)),
+            byteArrayOf(1, 2, 3),
+        )
+
+        val all = repo.all.first()
+
+        assertEquals(1, all.size)
+        assertNull(all[0].bestPrice)
+    }
 }

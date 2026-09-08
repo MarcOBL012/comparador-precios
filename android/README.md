@@ -22,7 +22,7 @@ App nativa (Kotlin + Compose + CameraX + Retrofit) contra `POST /api/scan` del b
 ## Tests
 
 - `./gradlew :app:testDebugUnitTest` — `DataUriTest`, `PriceSortingTest`, `ScanModelsTest`, `ScanViewModelTest` (JVM, sin SDK de IA ni red).
-- Requieren SDK 34 instalado. En esta máquina aún **no hay Android SDK**, así que corren en Android Studio/CI, no aquí.
+- Requieren SDK 34 instalado. `:app:testDebugUnitTest` y `:app:assembleDebug` corren en esta máquina; la prueba de cámara necesita un dispositivo físico.
 
 ## Historial
 

@@ -26,7 +26,7 @@ class HistoryRepository(private val dao: HistoryDao) {
             categoria = identification.categoria,
             confianza = identification.confianza,
             tiendasJson = RetrofitProvider.json.encodeToString(ListSerializer(StoreResult.serializer()), tiendas),
-            bestPrice = tiendas.filter { it.estado == "encontrado" }.minOfOrNull { it.precio ?: Double.MAX_VALUE },
+            bestPrice = tiendas.filter { it.estado == "encontrado" }.mapNotNull { it.precio }.minOrNull(),
             thumbnail = thumbnail,
         )
         return dao.upsert(record)
