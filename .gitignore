@@ -17,3 +17,5 @@ android/.idea/
 .claude/
 .agents/
 skills-lock.json
+
+docs/superpowers/
