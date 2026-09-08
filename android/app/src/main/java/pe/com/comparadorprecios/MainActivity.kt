@@ -11,6 +11,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
                                 val state by vm.state.collectAsState()
                                 var captureError by remember { mutableStateOf<String?>(null) }
                                 var manualName by remember { mutableStateOf("") }
+                                var pendingThumbnail by remember { mutableStateOf<ByteArray?>(null) }
 
                                 when (val s = state) {
                                     is ScanUiState.Idle -> {
@@ -91,7 +93,10 @@ class MainActivity : ComponentActivity() {
                                             ErrorScreen(message = err, onRetry = { captureError = null }, onBack = { captureError = null })
                                         } else {
                                             ScanScreen(
-                                                onImageCaptured = { vm.scan(it) },
+                                                onImageCaptured = { uri, thumbnail ->
+                                                    pendingThumbnail = thumbnail
+                                                    vm.scan(uri)
+                                                },
                                                 onError = { captureError = it },
                                             )
                                         }
@@ -114,6 +119,18 @@ class MainActivity : ComponentActivity() {
                                         onRetry = { vm.reset() },
                                         onBack = { vm.reset() },
                                     )
+                                }
+                                LaunchedEffect(state) {
+                                    val s = state
+                                    if (s is ScanUiState.Success) {
+                                        val thumbnail = pendingThumbnail
+                                        pendingThumbnail = null
+                                        if (thumbnail != null) {
+                                            runCatching {
+                                                historyRepository.save(s.identification, s.tiendas, thumbnail)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             composable(AppRoutes.HISTORY) {

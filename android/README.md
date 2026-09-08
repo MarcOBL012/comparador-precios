@@ -24,6 +24,14 @@ App nativa (Kotlin + Compose + CameraX + Retrofit) contra `POST /api/scan` del b
 - `./gradlew :app:testDebugUnitTest` — `DataUriTest`, `PriceSortingTest`, `ScanModelsTest`, `ScanViewModelTest` (JVM, sin SDK de IA ni red).
 - Requieren SDK 34 instalado. En esta máquina aún **no hay Android SDK**, así que corren en Android Studio/CI, no aquí.
 
+## Historial
+
+- Room local (`comparador-precios.db`, **solo en el dispositivo**, sin backend): cada `Success` del escaneo se guarda en segundo plano con `runCatching` — si Room falla, el resultado ya está en pantalla y no pasa nada.
+- Solo se guarda la **miniatura** (lado largo 256px, máx 200 KB JPEG, calidades 85→40), **nunca la foto completa**; si la miniatura falla, el escaneo continúa sin guardarse.
+- **Baja confianza no se guarda**: solo el estado `Success` dispara el guardado.
+- Lista con borrar + confirmación y Deshacer (Snackbar); el detalle muestra el registro idéntico al resultado.
+- **Desinstalar la app borra el historial** (la base de datos vive en el almacenamiento interno de la app).
+
 ## Estructura
 
 - `data/` — `ScanModels.kt` (contrato), `ScanApi.kt` (Retrofit, timeouts 60s por `maxDuration = 60` del backend), `ScanRepository.kt` (mapeo 400/502/500 → `ScanError`).

@@ -34,12 +34,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import pe.com.comparadorprecios.util.ImageEncoding
+import pe.com.comparadorprecios.util.ThumbnailEncoder
 import java.io.File
 import java.util.concurrent.Executor
 
 /** Pantalla de escaneo — captura puntual con CameraX (no streaming a IA). */
 @Composable
-fun ScanScreen(onImageCaptured: (dataUri: String) -> Unit, onError: (String) -> Unit) {
+fun ScanScreen(
+    onImageCaptured: (dataUri: String, thumbnail: ByteArray?) -> Unit,
+    onError: (String) -> Unit,
+) {
     val context = LocalContext.current
     var hasPermission by remember {
         mutableStateOf(
@@ -91,7 +95,7 @@ fun ScanScreen(onImageCaptured: (dataUri: String) -> Unit, onError: (String) -> 
 private fun capturePhoto(
     context: Context,
     imageCapture: ImageCapture,
-    onImageCaptured: (String) -> Unit,
+    onImageCaptured: (String, ByteArray?) -> Unit,
     onError: (String) -> Unit,
     onDone: () -> Unit,
 ) {
@@ -115,7 +119,12 @@ private fun capturePhoto(
                     if (ImageEncoding.exceedsLimit(dataUri)) {
                         onError("La foto es demasiado grande incluso comprimida. Acércate menos o baja la resolución.")
                     } else {
-                        onImageCaptured(dataUri)
+                        val thumbnail = if (bitmap != null) {
+                            runCatching { ThumbnailEncoder.encode(bitmap) }.getOrNull()
+                        } else {
+                            null
+                        }
+                        onImageCaptured(dataUri, thumbnail)
                     }
                 } catch (e: Exception) {
                     onError("No se pudo procesar la foto. Reintenta.")
