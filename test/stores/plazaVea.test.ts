@@ -16,6 +16,7 @@ const identification: ProductIdentification = {
   nombre: 'Leche evaporada',
   presentacion: '400g',
   categoria: 'abarrotes',
+  tipo: 'leche evaporada',
   confianza: 0.9,
 };
 

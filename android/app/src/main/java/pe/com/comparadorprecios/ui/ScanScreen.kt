@@ -12,15 +12,33 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,19 +46,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import pe.com.comparadorprecios.context.ScanPolicy
 import pe.com.comparadorprecios.util.ImageEncoding
 import pe.com.comparadorprecios.util.ThumbnailEncoder
 import java.io.File
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /** Pantalla de escaneo — captura puntual con CameraX (no streaming a IA). */
 @Composable
 fun ScanScreen(
+    policy: ScanPolicy,
+    selectedCategory: String?,
+    onCategoryChange: (String?) -> Unit,
     onImageCaptured: (dataUri: String, thumbnail: ByteArray?) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -67,6 +93,11 @@ fun ScanScreen(
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     var capturing by remember { mutableStateOf(false) }
+    // Decodificar y comprimir una foto de 12 MP en el hilo principal congela la UI en gama baja (ANR).
+    val processingExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose { processingExecutor.shutdown() }
+    }
 
     LaunchedEffect(previewView) {
         val provider = ProcessCameraProvider.getInstance(context).get()
@@ -79,65 +110,162 @@ fun ScanScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-        ExtendedFloatingActionButton(
-            onClick = {
-                if (capturing) return@ExtendedFloatingActionButton
-                capturing = true
-                capturePhoto(context, imageCapture, onImageCaptured, onError) { capturing = false }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
-            icon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
-            text = { Text(if (capturing) "Capturando…" else "Escanear producto") },
+        ContextNotices(
+            notices = policy.notices,
+            urgent = !policy.canScan,
+            modifier = Modifier.align(Alignment.TopCenter).padding(12.dp),
         )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
+                .padding(top = 32.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "¿Qué vas a escanear?",
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(8.dp))
+            CategoryChips(selectedId = selectedCategory, onSelect = onCategoryChange)
+            Spacer(Modifier.height(16.dp))
+            ShutterButton(
+                enabled = policy.canScan && !capturing,
+                capturing = capturing,
+                offline = !policy.canScan,
+                onClick = {
+                    capturing = true
+                    capturePhoto(
+                        context = context,
+                        imageCapture = imageCapture,
+                        maxImageSidePx = policy.maxImageSidePx,
+                        processingExecutor = processingExecutor,
+                        onImageCaptured = onImageCaptured,
+                        onError = onError,
+                    ) { capturing = false }
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when {
+                    !policy.canScan -> "Sin conexión"
+                    capturing -> "Capturando…"
+                    else -> "Enfoca la marca y el nombre del producto"
+                },
+                color = Color.White.copy(alpha = 0.9f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/** Elegir la categoría antes de la foto afina qué tiendas se consultan; "Automático" deja decidir a la IA. */
+@Composable
+private fun CategoryChips(selectedId: String?, onSelect: (String?) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(PRODUCT_CATEGORIES, key = { it.id ?: "auto" }) { category ->
+            val selected = category.id == selectedId
+            FilterChip(
+                selected = selected,
+                onClick = { onSelect(category.id) },
+                label = { Text(category.label) },
+                leadingIcon = { Icon(category.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Color.White.copy(alpha = 0.92f),
+                    labelColor = MaterialTheme.colorScheme.onSurface,
+                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedContainerColor = MaterialTheme.colorScheme.tertiary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onTertiary,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onTertiary,
+                ),
+                border = null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShutterButton(enabled: Boolean, capturing: Boolean, offline: Boolean, onClick: () -> Unit) {
+    val ring = if (enabled) MaterialTheme.colorScheme.tertiary else Color.White.copy(alpha = 0.4f)
+    Box(
+        modifier = Modifier
+            .size(84.dp)
+            .border(4.dp, ring, CircleShape)
+            .padding(8.dp)
+            .background(if (enabled) Color.White else Color.White.copy(alpha = 0.5f), CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            capturing -> CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+            else -> Icon(
+                if (offline) Icons.Filled.WifiOff else Icons.Filled.PhotoCamera,
+                contentDescription = if (offline) "Sin conexión" else "Escanear producto",
+                tint = if (offline) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(32.dp),
+            )
+        }
     }
 }
 
 private fun capturePhoto(
     context: Context,
     imageCapture: ImageCapture,
+    maxImageSidePx: Int,
+    processingExecutor: Executor,
     onImageCaptured: (String, ByteArray?) -> Unit,
     onError: (String) -> Unit,
     onDone: () -> Unit,
 ) {
     val file = File.createTempFile("scan_", ".jpg", context.cacheDir)
     val options = ImageCapture.OutputFileOptions.Builder(file).build()
-    val executor: Executor = ContextCompat.getMainExecutor(context)
+    val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
     imageCapture.takePicture(
         options,
-        executor,
+        processingExecutor,
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 try {
                     val bytes = file.readBytes()
                     val bitmap = ImageEncoding.decode(bytes)
                     val payload = if (bitmap != null) {
-                        ImageEncoding.compressToLimit(bitmap)
+                        ImageEncoding.compressToLimit(bitmap, maxSidePx = maxImageSidePx)
                     } else {
                         bytes
                     }
                     val dataUri = ImageEncoding.toDataUri(payload)
                     if (ImageEncoding.exceedsLimit(dataUri)) {
-                        onError("La foto es demasiado grande incluso comprimida. Acércate menos o baja la resolución.")
+                        mainExecutor.execute {
+                            onError("La foto es demasiado grande incluso comprimida. Acércate menos o baja la resolución.")
+                        }
                     } else {
                         val thumbnail = if (bitmap != null) {
                             runCatching { ThumbnailEncoder.encode(bitmap) }.getOrNull()
                         } else {
                             null
                         }
-                        onImageCaptured(dataUri, thumbnail)
+                        mainExecutor.execute { onImageCaptured(dataUri, thumbnail) }
                     }
                 } catch (e: Exception) {
-                    onError("No se pudo procesar la foto. Reintenta.")
+                    mainExecutor.execute { onError("No se pudo procesar la foto. Reintenta.") }
                 } finally {
                     file.delete()
-                    onDone()
+                    mainExecutor.execute(onDone)
                 }
             }
 
             override fun onError(exception: ImageCaptureException) {
                 file.delete()
-                onError("No se pudo tomar la foto. Reintenta.")
-                onDone()
+                mainExecutor.execute {
+                    onError("No se pudo tomar la foto. Reintenta.")
+                    onDone()
+                }
             }
         },
     )

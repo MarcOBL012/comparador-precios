@@ -1,11 +1,12 @@
 import { pickBestMatch, type MatchCandidate } from '../matching.js';
-import type { ProductIdentification } from '../productIdentification.js';
+import type { ProductQuery } from '../productIdentification.js';
 import type { StoreProduct } from './types.js';
 
 interface VtexProduct {
   productName: string;
   brand: string;
   link: string;
+  categories?: string[];
   items?: Array<{
     sellers?: Array<{
       commertialOffer?: {
@@ -29,10 +30,11 @@ export interface VtexStoreConfig {
 
 export async function searchVtexStore(
   config: VtexStoreConfig,
-  identification: ProductIdentification
+  identification: ProductQuery
 ): Promise<StoreProduct | null> {
   const term = `${identification.marca} ${identification.nombre}`.trim();
-  const url = `${config.baseUrl}/api/catalog_system/pub/products/search/${encodeURIComponent(term)}?_from=0&_to=9`;
+  // 20 resultados: con 10, "Gloria Leche evaporada" en Plaza Vea dejaba fuera la única leche evaporada (puesto 13).
+  const url = `${config.baseUrl}/api/catalog_system/pub/products/search/${encodeURIComponent(term)}?_from=0&_to=19`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -76,6 +78,7 @@ export async function searchVtexStore(
       candidates.push({
         productName: product.productName,
         brand: product.brand,
+        categories: product.categories,
         precio: offer.Price,
         url: product.link,
       });

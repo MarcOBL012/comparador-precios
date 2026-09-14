@@ -20,6 +20,8 @@ sealed interface ScanUiState {
     data class Success(
         val identification: Identification,
         val tiendas: List<StoreResult>,
+        /** El backend omitió la búsqueda web porque el celular avisó batería baja. */
+        val webSearchSkipped: Boolean = false,
     ) : ScanUiState
 
     data class Error(val message: String) : ScanUiState

@@ -1,5 +1,6 @@
 package pe.com.comparadorprecios.history
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -15,6 +16,7 @@ data class ScanRecord(
     val tiendasJson: String,
     val bestPrice: Double?,
     val thumbnail: ByteArray,
+    @ColumnInfo(defaultValue = "") val tipo: String = "",
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -38,13 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import pe.com.comparadorprecios.data.StoreResult
 import pe.com.comparadorprecios.history.HistoryItem
+import pe.com.comparadorprecios.history.PriceChange
+import pe.com.comparadorprecios.history.PriceCheckSnapshot
+import pe.com.comparadorprecios.history.PriceTrend
 import java.text.DateFormat
-import java.text.NumberFormat
 import java.util.Date
-import java.util.Locale
-
-private val soles = NumberFormat.getCurrencyInstance(Locale("es", "PE"))
 
 @Composable
 fun HistoryScreen(
@@ -130,9 +131,17 @@ private fun HistoryRow(item: HistoryItem, onOpen: () -> Unit, onDelete: () -> Un
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    if (item.bestPrice != null) "Desde ${soles.format(item.bestPrice)}" else "Sin precios",
+                    if (item.bestPrice != null) "Desde ${formatSoles(item.bestPrice)}" else "Sin precios",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                if (item.priceDropped) {
+                    Spacer(Modifier.height(4.dp))
+                    Pill(
+                        text = "▼ Bajó a ${formatSoles(item.latestBestPrice!!)}",
+                        container = MaterialTheme.colorScheme.primary,
+                        content = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
@@ -141,12 +150,105 @@ private fun HistoryRow(item: HistoryItem, onOpen: () -> Unit, onDelete: () -> Un
     }
 }
 
-/** Detalle: reusa la comparación existente con los datos guardados. */
+/** Detalle: la comparación guardada más la revisión de precio contra el día del escaneo. */
 @Composable
-fun DetailScreen(item: HistoryItem, onBack: () -> Unit) {
+fun DetailScreen(
+    item: HistoryItem,
+    latestCheck: PriceCheckSnapshot?,
+    checking: Boolean,
+    checkError: String?,
+    canCheck: Boolean,
+    onCheckPrices: () -> Unit,
+    onAddToList: (tiendas: List<StoreResult>) -> Unit,
+    onBack: () -> Unit,
+) {
+    val currentTiendas = latestCheck?.tiendas ?: item.tiendas
     ResultScreen(
         identification = item.identification,
         tiendas = item.tiendas,
         onNewScan = onBack,
+        newScanLabel = "Volver al historial",
+        onAddToList = { onAddToList(currentTiendas) },
+        extraContent = {
+            item(key = "price-check") {
+                PriceCheckCard(
+                    scannedAt = item.dateMillis,
+                    original = item.tiendas,
+                    latestCheck = latestCheck,
+                    checking = checking,
+                    checkError = checkError,
+                    canCheck = canCheck,
+                    onCheckPrices = onCheckPrices,
+                )
+            }
+        },
     )
+}
+
+@Composable
+private fun PriceCheckCard(
+    scannedAt: Long,
+    original: List<StoreResult>,
+    latestCheck: PriceCheckSnapshot?,
+    checking: Boolean,
+    checkError: String?,
+    canCheck: Boolean,
+    onCheckPrices: () -> Unit,
+) {
+    val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("¿Cambió el precio?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (latestCheck == null) {
+                Text(
+                    "Los precios de arriba son del ${dateFormat.format(Date(scannedAt))}. Revisa cuánto cuesta hoy.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                Text(
+                    "Escaneado el ${dateFormat.format(Date(scannedAt))} · revisado el ${dateFormat.format(Date(latestCheck.checkedAt))}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                val changes = PriceTrend.compare(original, latestCheck.tiendas)
+                if (changes.isEmpty()) {
+                    Text("Hoy ninguna tienda tiene este producto.")
+                }
+                changes.forEach { PriceChangeRow(it) }
+            }
+            checkError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            OutlinedButton(
+                onClick = onCheckPrices,
+                enabled = canCheck && !checking,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    when {
+                        checking -> "Revisando…"
+                        !canCheck -> "Sin conexión"
+                        else -> "Revisar precio ahora"
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PriceChangeRow(change: PriceChange) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(change.tienda, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        val difference = change.difference
+        val (text, color) = when {
+            change.now == null -> "ya no disponible" to MaterialTheme.colorScheme.onSurfaceVariant
+            change.before == null -> "nuevo: ${formatSoles(change.now)}" to MaterialTheme.colorScheme.onSurface
+            difference != null && difference < -0.005 ->
+                "${formatSoles(change.now)} (bajó ${formatSoles(-difference)})" to MaterialTheme.colorScheme.primary
+            difference != null && difference > 0.005 ->
+                "${formatSoles(change.now)} (subió ${formatSoles(difference)})" to MaterialTheme.colorScheme.error
+            else -> "${formatSoles(change.now)} (igual)" to MaterialTheme.colorScheme.onSurface
+        }
+        Text(text, color = color, style = MaterialTheme.typography.bodyMedium)
+    }
 }

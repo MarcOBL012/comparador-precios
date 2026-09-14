@@ -1,16 +1,24 @@
 package pe.com.comparadorprecios.history
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.builtins.ListSerializer
 import pe.com.comparadorprecios.data.Identification
-import pe.com.comparadorprecios.data.RetrofitProvider
+import pe.com.comparadorprecios.data.StoreResultsJson
 import pe.com.comparadorprecios.data.StoreResult
+
+data class PriceCheckSnapshot(
+    val checkedAt: Long,
+    val tiendas: List<StoreResult>,
+)
 
 class HistoryRepository(private val dao: HistoryDao) {
 
     val all: Flow<List<HistoryItem>> =
-        dao.observeAll().map { records -> records.map { it.toItem() } }
+        combine(dao.observeAll(), dao.observeLatestBestPrices()) { records, latest ->
+            val latestByScan = latest.associate { it.scanId to it.bestPrice }
+            records.map { it.toItem(latestBestPrice = latestByScan[it.id]) }
+        }
 
     suspend fun save(
         identification: Identification,
@@ -24,15 +32,16 @@ class HistoryRepository(private val dao: HistoryDao) {
             nombre = identification.nombre,
             presentacion = identification.presentacion,
             categoria = identification.categoria,
+            tipo = identification.tipo,
             confianza = identification.confianza,
-            tiendasJson = RetrofitProvider.json.encodeToString(ListSerializer(StoreResult.serializer()), tiendas),
-            bestPrice = tiendas.filter { it.estado == "encontrado" }.mapNotNull { it.precio }.minOrNull(),
+            tiendasJson = StoreResultsJson.encode(tiendas),
+            bestPrice = PriceTrend.bestPrice(tiendas),
             thumbnail = thumbnail,
         )
         return dao.upsert(record)
     }
 
-    suspend fun get(id: Long): HistoryItem? = dao.getById(id)?.toItem()
+    suspend fun get(id: Long): HistoryItem? = dao.getById(id)?.toItem(latestBestPrice = null)
 
     /** Borra y devuelve el registro para poder restaurarlo (deshacer). */
     suspend fun delete(id: Long): ScanRecord? {
@@ -45,16 +54,23 @@ class HistoryRepository(private val dao: HistoryDao) {
         dao.upsert(record)
     }
 
-    private fun ScanRecord.toItem(): HistoryItem {
-        val tiendas = RetrofitProvider.json.decodeFromString(ListSerializer(StoreResult.serializer()), tiendasJson)
-        return HistoryItem(
-            id = id,
-            title = "$marca $nombre $presentacion".trim(),
-            dateMillis = createdAt,
-            bestPrice = bestPrice,
-            thumbnail = thumbnail,
-            identification = Identification(marca, nombre, presentacion, categoria, confianza),
-            tiendas = tiendas,
+    suspend fun saveCheck(scanId: Long, tiendas: List<StoreResult>, checkedAt: Long = System.currentTimeMillis()) {
+        dao.insertCheck(
+            PriceCheck(scanId = scanId, checkedAt = checkedAt, tiendasJson = StoreResultsJson.encode(tiendas), bestPrice = PriceTrend.bestPrice(tiendas))
         )
     }
+
+    fun latestCheck(scanId: Long): Flow<PriceCheckSnapshot?> =
+        dao.observeLatestCheck(scanId).map { check -> check?.let { PriceCheckSnapshot(it.checkedAt, StoreResultsJson.decode(it.tiendasJson)) } }
+
+    private fun ScanRecord.toItem(latestBestPrice: Double?): HistoryItem = HistoryItem(
+        id = id,
+        title = "$marca $nombre $presentacion".trim(),
+        dateMillis = createdAt,
+        bestPrice = bestPrice,
+        latestBestPrice = latestBestPrice,
+        thumbnail = thumbnail,
+        identification = Identification(marca, nombre, presentacion, categoria, confianza, tipo),
+        tiendas = StoreResultsJson.decode(tiendasJson),
+    )
 }

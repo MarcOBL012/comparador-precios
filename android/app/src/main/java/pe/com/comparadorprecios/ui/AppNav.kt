@@ -3,6 +3,7 @@ package pe.com.comparadorprecios.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -16,6 +17,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 object AppRoutes {
     const val SCAN = "scan"
     const val HISTORY = "history"
+    const val SHOPPING = "shopping"
     const val DETAIL_ARG = "scanId"
     const val DETAIL = "detail/{$DETAIL_ARG}"
     fun detailRoute(id: Long): String = "detail/$id"
@@ -26,6 +28,7 @@ private data class BottomDestination(val route: String, val label: String, val i
 private val BOTTOM_DESTINATIONS = listOf(
     BottomDestination(AppRoutes.SCAN, "Escanear", Icons.Filled.PhotoCamera),
     BottomDestination(AppRoutes.HISTORY, "Historial", Icons.Filled.History),
+    BottomDestination(AppRoutes.SHOPPING, "Lista", Icons.Filled.ShoppingCart),
 )
 
 @Composable

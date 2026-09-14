@@ -6,8 +6,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import pe.com.comparadorprecios.data.DeviceContextPayload
 import pe.com.comparadorprecios.data.ScanError
 import pe.com.comparadorprecios.data.ScanRepository
+import pe.com.comparadorprecios.data.WEB_SEARCH_SKIPPED_FOR_BATTERY
 import pe.com.comparadorprecios.data.isLowConfidence
 import pe.com.comparadorprecios.util.PriceSorting
 
@@ -41,18 +43,19 @@ class ScanViewModel(
         }
     }
 
-    fun scan(imageDataUri: String) {
+    fun scan(imageDataUri: String, saveBattery: Boolean = false, categoria: String? = null) {
         if (_state.value is ScanUiState.Loading) return
         _state.value = ScanUiState.Loading
         viewModelScope.launch {
             try {
-                val response = repository.scan(imageDataUri)
+                val response = repository.scan(imageDataUri, DeviceContextPayload(ahorroBateria = saveBattery), categoria)
                 _state.value = if (response.identification.isLowConfidence()) {
                     ScanUiState.LowConfidence(response.identification)
                 } else {
                     ScanUiState.Success(
                         identification = response.identification,
                         tiendas = PriceSorting.sortForDisplay(response.tiendas),
+                        webSearchSkipped = response.busquedaWeb == WEB_SEARCH_SKIPPED_FOR_BATTERY,
                     )
                 }
             } catch (e: ScanError.Unauthorized) {

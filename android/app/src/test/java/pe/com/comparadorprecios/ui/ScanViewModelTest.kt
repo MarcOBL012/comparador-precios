@@ -17,6 +17,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnitRunner
+import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import pe.com.comparadorprecios.data.Identification
 import pe.com.comparadorprecios.data.ScanError
@@ -50,7 +52,7 @@ class ScanViewModelTest {
 
     @Test
     fun `exito ordena tiendas por precio`() = runTest(dispatcher) {
-        whenever(repository.scan("uri")).thenReturn(
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenReturn(
             ScanResponse(
                 identification,
                 listOf(
@@ -69,7 +71,7 @@ class ScanViewModelTest {
 
     @Test
     fun `confianza baja produce LowConfidence`() = runTest(dispatcher) {
-        whenever(repository.scan("uri")).thenReturn(
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenReturn(
             ScanResponse(identification.copy(confianza = 0.2), emptyList())
         )
         val vm = ScanViewModel(repository)
@@ -80,7 +82,7 @@ class ScanViewModelTest {
 
     @Test
     fun `error 400 produce mensaje de validacion`() = runTest(dispatcher) {
-        whenever(repository.scan("uri")).thenThrow(ScanError.Validation("La imagen no es válida."))
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenThrow(ScanError.Validation("La imagen no es válida."))
         val vm = ScanViewModel(repository)
         vm.scan("uri")
         dispatcher.scheduler.advanceUntilIdle()
@@ -90,7 +92,7 @@ class ScanViewModelTest {
 
     @Test
     fun `error 502 produce mensaje de identificacion`() = runTest(dispatcher) {
-        whenever(repository.scan("uri")).thenThrow(ScanError.IdentificationFailed("No se pudo identificar."))
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenThrow(ScanError.IdentificationFailed("No se pudo identificar."))
         val vm = ScanViewModel(repository)
         vm.scan("uri")
         dispatcher.scheduler.advanceUntilIdle()
@@ -99,7 +101,7 @@ class ScanViewModelTest {
 
     @Test
     fun `error 401 produce Unauthorized con mensaje`() = runTest(dispatcher) {
-        whenever(repository.scan("uri")).thenThrow(
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenThrow(
             ScanError.Unauthorized("Tu sesión expiró. Inicia sesión de nuevo.")
         )
         val vm = ScanViewModel(repository)
@@ -119,7 +121,7 @@ class ScanViewModelTest {
         // salir/re-entrar de la rama Scanning tras un signOut forzado por 401. Si reset()
         // no limpiara Unauthorized, el usuario quedaría en un bucle permanente de
         // signOut al volver a iniciar sesión.
-        whenever(repository.scan("uri")).thenThrow(
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenThrow(
             ScanError.Unauthorized("Tu sesión expiró. Inicia sesión de nuevo.")
         )
         val vm = ScanViewModel(repository)
@@ -141,7 +143,7 @@ class ScanViewModelTest {
         // Este test debe fallar si el orden vuelve a ser reset() -> launch { signOut() }: por eso
         // signOut() aquí hace delay() antes de completar, y verificamos que el estado SIGUE siendo
         // Unauthorized mientras signOut está en vuelo, y solo pasa a Idle después de que termina.
-        whenever(repository.scan("uri")).thenThrow(
+        whenever(repository.scan(eq("uri"), anyOrNull(), anyOrNull())).thenThrow(
             ScanError.Unauthorized("Tu sesión expiró. Inicia sesión de nuevo.")
         )
         val vm = ScanViewModel(repository)

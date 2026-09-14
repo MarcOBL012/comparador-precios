@@ -94,26 +94,19 @@ describe('POST /api/scan (integración completa: scanHandler, identifyProduct y 
 
     await handler(req, res);
 
+    const found = (tienda: string) => ({
+      tienda,
+      estado: 'encontrado',
+      producto: 'Leche Evaporada Gloria 400g',
+      precio: 4.5,
+      url: 'https://tienda.example.pe/p/1',
+    });
     expect(res.statusCode).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(res.body).toEqual({
       identification,
-      tiendas: [
-        {
-          tienda: 'Plaza Vea',
-          estado: 'encontrado',
-          producto: 'Leche Evaporada Gloria 400g',
-          precio: 4.5,
-          url: 'https://tienda.example.pe/p/1',
-        },
-        {
-          tienda: 'Wong',
-          estado: 'encontrado',
-          producto: 'Leche Evaporada Gloria 400g',
-          precio: 4.5,
-          url: 'https://tienda.example.pe/p/1',
-        },
-      ],
+      tiendas: [found('Plaza Vea'), found('Wong'), found('Metro')],
+      busquedaWeb: 'no_aplica',
     });
   });
 });

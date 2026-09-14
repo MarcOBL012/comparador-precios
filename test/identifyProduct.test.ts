@@ -48,6 +48,18 @@ describe('identifyProduct', () => {
     ]);
   });
 
+  it('incluye la categoría elegida por la persona como pista en el prompt', async () => {
+    generateTextMock.mockResolvedValue({ output: VALID_IDENTIFICATION });
+
+    await identifyProduct('data:image/jpeg;base64,ABC123', 'tecnologia');
+    const withChoice = generateTextMock.mock.calls[0][0].messages[0].content[0].text;
+    await identifyProduct('data:image/jpeg;base64,ABC123');
+    const withoutChoice = generateTextMock.mock.calls[1][0].messages[0].content[0].text;
+
+    expect(withChoice).toContain('categoría "tecnologia"');
+    expect(withoutChoice).not.toContain('la persona indicó');
+  });
+
   it('propaga el error si generateText falla', async () => {
     generateTextMock.mockRejectedValue(new Error('timeout de red'));
 

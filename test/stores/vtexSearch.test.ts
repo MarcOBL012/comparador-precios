@@ -7,6 +7,7 @@ const identification: ProductIdentification = {
   nombre: 'Leche evaporada',
   presentacion: '400g',
   categoria: 'abarrotes',
+  tipo: 'leche evaporada',
   confianza: 0.9,
 };
 
@@ -38,7 +39,7 @@ describe('searchVtexStore', () => {
     await searchVtexStore(CONFIG, identification);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://www.example-store.pe/api/catalog_system/pub/products/search/Gloria%20Leche%20evaporada?_from=0&_to=9',
+      'https://www.example-store.pe/api/catalog_system/pub/products/search/Gloria%20Leche%20evaporada?_from=0&_to=19',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
