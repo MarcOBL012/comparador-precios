@@ -15,10 +15,13 @@ import retrofit2.http.POST
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** Único endpoint del backend (Planes 1+2). */
 interface ScanApi {
     @POST("api/scan")
     suspend fun scan(@Body request: ScanRequest): ScanResponse
+
+    /** Precios de un producto ya identificado, sin foto (lista de compras, revisar precio en historial). */
+    @POST("api/prices")
+    suspend fun prices(@Body request: PricesRequest): PricesResponse
 }
 
 object RetrofitProvider {

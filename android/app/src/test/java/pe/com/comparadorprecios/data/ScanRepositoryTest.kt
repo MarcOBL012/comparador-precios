@@ -20,6 +20,15 @@ class ScanRepositoryTest {
                 )
             )
         }
+
+        override suspend fun prices(request: PricesRequest): PricesResponse {
+            throw HttpException(
+                Response.error<PricesResponse>(
+                    code,
+                    "{}".toResponseBody("application/json".toMediaType()),
+                )
+            )
+        }
     }
 
     @Test

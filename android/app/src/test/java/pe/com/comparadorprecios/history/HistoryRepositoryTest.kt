@@ -85,6 +85,30 @@ class HistoryRepositoryTest {
     }
 
     @Test
+    fun `una revision mas barata marca el escaneo como bajado de precio`() = runTest {
+        val id = repo.save(identification, tiendas, byteArrayOf(1))
+
+        repo.saveCheck(id, listOf(StoreResult("Wong", "encontrado", "Leche", 3.9, "https://www.wong.pe/p/1")), checkedAt = 1L)
+
+        val item = repo.all.first().single()
+        assertEquals(3.9, item.latestBestPrice!!, 0.0)
+        assertTrue(item.priceDropped)
+        assertEquals(3.9, repo.latestCheck(id).first()!!.tiendas.single().precio!!, 0.0)
+    }
+
+    @Test
+    fun `el historial usa la revision mas reciente, no la primera`() = runTest {
+        val id = repo.save(identification, tiendas, byteArrayOf(1))
+
+        repo.saveCheck(id, listOf(StoreResult("Wong", "encontrado", "Leche", 3.9, null)), checkedAt = 1L)
+        repo.saveCheck(id, listOf(StoreResult("Wong", "encontrado", "Leche", 4.8, null)), checkedAt = 2L)
+
+        val item = repo.all.first().single()
+        assertEquals(4.8, item.latestBestPrice!!, 0.0)
+        assertTrue(!item.priceDropped)
+    }
+
+    @Test
     fun `get devuelve null para id inexistente`() = runTest {
         assertNull(repo.get(9999L))
     }
