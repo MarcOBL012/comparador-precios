@@ -29,8 +29,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -67,6 +67,7 @@ fun ScanScreen(
     policy: ScanPolicy,
     selectedCategory: String?,
     onCategoryChange: (String?) -> Unit,
+    pendingCount: Int,
     onImageCaptured: (dataUri: String, thumbnail: ByteArray?) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -110,11 +111,20 @@ fun ScanScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-        ContextNotices(
-            notices = policy.notices,
-            urgent = !policy.canScan,
+        Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(12.dp),
-        )
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ContextNotices(notices = policy.notices)
+            if (pendingCount > 0) {
+                ContextNotices(
+                    notices = listOf(
+                        if (pendingCount == 1) "1 escaneo pendiente por procesar."
+                        else "$pendingCount escaneos pendientes por procesar."
+                    ),
+                )
+            }
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -133,9 +143,9 @@ fun ScanScreen(
             CategoryChips(selectedId = selectedCategory, onSelect = onCategoryChange)
             Spacer(Modifier.height(16.dp))
             ShutterButton(
-                enabled = policy.canScan && !capturing,
+                enabled = !capturing,
                 capturing = capturing,
-                offline = !policy.canScan,
+                offline = policy.offline,
                 onClick = {
                     capturing = true
                     capturePhoto(
@@ -151,8 +161,8 @@ fun ScanScreen(
             Spacer(Modifier.height(8.dp))
             Text(
                 when {
-                    !policy.canScan -> "Sin conexión"
                     capturing -> "Capturando…"
+                    policy.offline -> "Sin conexión: la foto quedará pendiente"
                     else -> "Enfoca la marca y el nombre del producto"
                 },
                 color = Color.White.copy(alpha = 0.9f),
@@ -190,9 +200,14 @@ private fun CategoryChips(selectedId: String?, onSelect: (String?) -> Unit) {
     }
 }
 
+/**
+ * Sin conexión el disparador sigue activo (requisito del modo SIN CONEXIÓN): solo cambia el color
+ * del aro y el ícono, para que se note que la foto se guardará en vez de procesarse al instante.
+ */
 @Composable
 private fun ShutterButton(enabled: Boolean, capturing: Boolean, offline: Boolean, onClick: () -> Unit) {
-    val ring = if (enabled) MaterialTheme.colorScheme.tertiary else Color.White.copy(alpha = 0.4f)
+    val accent = if (offline) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
+    val ring = if (enabled) accent else Color.White.copy(alpha = 0.4f)
     Box(
         modifier = Modifier
             .size(84.dp)
@@ -205,9 +220,9 @@ private fun ShutterButton(enabled: Boolean, capturing: Boolean, offline: Boolean
         when {
             capturing -> CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
             else -> Icon(
-                if (offline) Icons.Filled.WifiOff else Icons.Filled.PhotoCamera,
-                contentDescription = if (offline) "Sin conexión" else "Escanear producto",
-                tint = if (offline) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,
+                if (offline) Icons.Filled.CloudOff else Icons.Filled.PhotoCamera,
+                contentDescription = if (offline) "Tomar foto y guardar como pendiente" else "Escanear producto",
+                tint = accent,
                 modifier = Modifier.size(32.dp),
             )
         }

@@ -36,6 +36,8 @@ import pe.com.comparadorprecios.data.RetrofitProvider
 import pe.com.comparadorprecios.data.ScanRepository
 import pe.com.comparadorprecios.history.AppDatabase
 import pe.com.comparadorprecios.history.HistoryRepository
+import pe.com.comparadorprecios.pending.PendingScanProcessor
+import pe.com.comparadorprecios.pending.PendingScanRepository
 import pe.com.comparadorprecios.shopping.ShoppingListRepository
 import pe.com.comparadorprecios.ui.AppBottomBar
 import pe.com.comparadorprecios.ui.AppFlowState
@@ -49,6 +51,7 @@ import pe.com.comparadorprecios.ui.HistoryViewModel
 import pe.com.comparadorprecios.ui.LoadingScreen
 import pe.com.comparadorprecios.ui.LowConfidenceScreen
 import pe.com.comparadorprecios.ui.OnboardingScreen
+import pe.com.comparadorprecios.ui.PendingScansViewModel
 import pe.com.comparadorprecios.ui.ResultScreen
 import pe.com.comparadorprecios.ui.ScanScreen
 import pe.com.comparadorprecios.ui.ScanUiState
@@ -58,6 +61,7 @@ import pe.com.comparadorprecios.ui.ShoppingListViewModel
 import pe.com.comparadorprecios.ui.SigningOutScreen
 import pe.com.comparadorprecios.ui.SplashScreen
 import pe.com.comparadorprecios.ui.openWebSearch
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,11 +123,35 @@ class MainActivity : ComponentActivity() {
                             val db = remember { AppDatabase.build(context) }
                             val historyRepository = remember { HistoryRepository(db.historyDao()) }
                             val shoppingListRepository = remember { ShoppingListRepository(db.shoppingDao()) }
+                            val pendingRepository = remember {
+                                PendingScanRepository(db.pendingScanDao(), File(context.filesDir, "pending-scans"))
+                            }
+                            val pendingProcessor = remember {
+                                PendingScanProcessor(pendingRepository, repository, historyRepository)
+                            }
 
                             val vm: ScanViewModel = viewModel { ScanViewModel(repository) }
+                            val pendingVm: PendingScansViewModel =
+                                viewModel { PendingScansViewModel(pendingRepository, pendingProcessor) }
+                            val pendingScans by pendingVm.pending.collectAsState()
+                            val processingPending by pendingVm.processing.collectAsState()
+                            val pendingMessage by pendingVm.message.collectAsState()
                             var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
                             val navController = rememberNavController()
                             val snackbar = remember { SnackbarHostState() }
+
+                            // Vuelve la conexión (o se abre la app con pendientes de una sesión
+                            // anterior) → se procesa la cola sola, sin que el usuario haga nada.
+                            LaunchedEffect(policy.offline) {
+                                if (!policy.offline) pendingVm.processPending(policy.saveBattery)
+                            }
+
+                            LaunchedEffect(pendingMessage) {
+                                pendingMessage?.let {
+                                    snackbar.showSnackbar(it)
+                                    pendingVm.dismissMessage()
+                                }
+                            }
 
                             Scaffold(
                                 bottomBar = { AppBottomBar(navController) },
@@ -150,9 +178,16 @@ class MainActivity : ComponentActivity() {
                                                         policy = policy,
                                                         selectedCategory = selectedCategory,
                                                         onCategoryChange = { selectedCategory = it },
+                                                        pendingCount = pendingScans.size,
                                                         onImageCaptured = { uri, thumbnail ->
-                                                            pendingThumbnail = thumbnail
-                                                            vm.scan(uri, saveBattery = policy.saveBattery, categoria = selectedCategory)
+                                                            // Sin conexión no se llama ni a Gemini ni a las
+                                                            // tiendas: la foto se encola tal cual.
+                                                            if (policy.offline) {
+                                                                pendingVm.saveForLater(uri, thumbnail, selectedCategory)
+                                                            } else {
+                                                                pendingThumbnail = thumbnail
+                                                                vm.scan(uri, saveBattery = policy.saveBattery, categoria = selectedCategory)
+                                                            }
                                                         },
                                                         onError = { captureError = it },
                                                     )
@@ -209,6 +244,13 @@ class MainActivity : ComponentActivity() {
                                             viewModel = historyVm,
                                             snackbar = snackbar,
                                             onOpen = { id -> navController.navigate(AppRoutes.detailRoute(id)) },
+                                            pendingScans = pendingScans,
+                                            processingPending = processingPending,
+                                            offline = policy.offline,
+                                            onProcessPending = {
+                                                pendingVm.processPending(policy.saveBattery, announceEmpty = true)
+                                            },
+                                            onDiscardPending = { pendingVm.discard(it) },
                                         )
                                     }
                                     composable(AppRoutes.SHOPPING) {
@@ -216,7 +258,7 @@ class MainActivity : ComponentActivity() {
                                         ShoppingListScreen(
                                             viewModel = shoppingVm,
                                             snackbar = snackbar,
-                                            canRefresh = policy.canScan,
+                                            canRefresh = !policy.offline,
                                             saveBattery = policy.saveBattery,
                                             onGoScan = {
                                                 navController.navigate(AppRoutes.SCAN) {
@@ -243,7 +285,7 @@ class MainActivity : ComponentActivity() {
                                                 latestCheck = latestCheck,
                                                 checking = checking,
                                                 checkError = checkError,
-                                                canCheck = policy.canScan,
+                                                canCheck = !policy.offline,
                                                 onCheckPrices = { detailVm.checkPrices(policy.saveBattery) },
                                                 onAddToList = { tiendas ->
                                                     scope.launch {

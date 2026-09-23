@@ -10,9 +10,15 @@ data class DeviceContext(
     val powerSaveMode: Boolean,
 )
 
-/** Cómo debe comportarse el escaneo dado el contexto. */
+/**
+ * Cómo debe comportarse el escaneo dado el contexto.
+ *
+ * Sin conexión la foto SÍ se toma: queda encolada como pendiente y se procesa sola al volver la
+ * red (ver PendingScanRepository). `offline` también apaga lo que sí exige internet ahora mismo,
+ * como actualizar precios de la lista o revisar el precio de un escaneo del historial.
+ */
 data class ScanPolicy(
-    val canScan: Boolean,
+    val offline: Boolean,
     val maxImageSidePx: Int,
     val saveBattery: Boolean,
     val notices: List<String>,
@@ -29,7 +35,7 @@ object ContextPolicy {
     const val LOW_BATTERY_PERCENT = 20
 
     const val NOTICE_OFFLINE =
-        "Sin conexión: conéctate a internet para escanear. Tu historial y tu lista siguen disponibles."
+        "Sin conexión: puedes tomar la foto igual. Queda pendiente y se procesa sola cuando vuelva el internet."
     const val NOTICE_METERED =
         "Datos móviles: la foto se envía en menor resolución para gastar menos datos."
     const val NOTICE_LOW_BATTERY =
@@ -47,7 +53,7 @@ object ContextPolicy {
             if (!offline && lowBattery) add(NOTICE_LOW_BATTERY)
         }
         return ScanPolicy(
-            canScan = !offline,
+            offline = offline,
             maxImageSidePx = if (metered || lowBattery) REDUCED_IMAGE_SIDE_PX else FULL_IMAGE_SIDE_PX,
             saveBattery = lowBattery,
             notices = notices,

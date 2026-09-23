@@ -6,13 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import pe.com.comparadorprecios.pending.PendingScan
+import pe.com.comparadorprecios.pending.PendingScanDao
 import pe.com.comparadorprecios.shopping.ShoppingDao
 import pe.com.comparadorprecios.shopping.ShoppingItem
 
-@Database(entities = [ScanRecord::class, PriceCheck::class, ShoppingItem::class], version = 2, exportSchema = false)
+@Database(
+    entities = [ScanRecord::class, PriceCheck::class, ShoppingItem::class, PendingScan::class],
+    version = 3,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
     abstract fun shoppingDao(): ShoppingDao
+    abstract fun pendingScanDao(): PendingScanDao
 
     companion object {
         const val NAME = "comparador-precios.db"
@@ -37,9 +44,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Cola de fotos tomadas sin conexión (modo SIN CONEXIÓN). */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS pending_scans (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, createdAt INTEGER NOT NULL, " +
+                        "imagePath TEXT NOT NULL, thumbnail BLOB, categoria TEXT, lastError TEXT)"
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }
