@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,11 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
@@ -44,6 +48,7 @@ import pe.com.comparadorprecios.history.HistoryItem
 import pe.com.comparadorprecios.history.PriceChange
 import pe.com.comparadorprecios.history.PriceCheckSnapshot
 import pe.com.comparadorprecios.history.PriceTrend
+import pe.com.comparadorprecios.pending.PendingScan
 import java.text.DateFormat
 import java.util.Date
 
@@ -52,6 +57,11 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     snackbar: SnackbarHostState,
     onOpen: (Long) -> Unit,
+    pendingScans: List<PendingScan> = emptyList(),
+    processingPending: Boolean = false,
+    offline: Boolean = false,
+    onProcessPending: () -> Unit = {},
+    onDiscardPending: (Long) -> Unit = {},
 ) {
     val items by viewModel.items.collectAsState()
     val showUndo by viewModel.showUndo.collectAsState()
@@ -65,7 +75,7 @@ fun HistoryScreen(
         }
     }
 
-    if (items.isEmpty()) {
+    if (items.isEmpty() && pendingScans.isEmpty()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -82,6 +92,29 @@ fun HistoryScreen(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (pendingScans.isNotEmpty()) {
+            item(key = "pending-header") {
+                PendingHeader(
+                    count = pendingScans.size,
+                    processing = processingPending,
+                    offline = offline,
+                    onProcessPending = onProcessPending,
+                )
+            }
+            items(pendingScans, key = { "pending-${it.id}" }) { scan ->
+                PendingRow(scan = scan, onDiscard = { onDiscardPending(scan.id) })
+            }
+            if (items.isNotEmpty()) {
+                item(key = "history-header") {
+                    Text(
+                        "Procesados",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        }
         items(items, key = { it.id }) { item ->
             HistoryRow(
                 item = item,
@@ -106,6 +139,81 @@ fun HistoryScreen(
                 TextButton(onClick = { pendingDelete = null }) { Text("Cancelar") }
             },
         )
+    }
+}
+
+@Composable
+private fun PendingHeader(count: Int, processing: Boolean, offline: Boolean, onProcessPending: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.CloudOff, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (count == 1) "1 escaneo pendiente" else "$count escaneos pendientes",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Text(
+                when {
+                    processing -> "Procesando…"
+                    offline -> "Se procesarán automáticamente cuando vuelva el internet."
+                    else -> "Hay conexión: se están procesando solos. También puedes forzarlo."
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (processing) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else if (!offline) {
+                OutlinedButton(onClick = onProcessPending, modifier = Modifier.fillMaxWidth()) {
+                    Text("Procesar ahora")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingRow(scan: PendingScan, onDiscard: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            val bitmap = remember(scan.id) {
+                scan.thumbnail?.takeIf { it.isNotEmpty() }?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            }
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Foto pendiente",
+                    modifier = Modifier.size(56.dp),
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(56.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.CloudOff, contentDescription = null) }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Pendiente de procesar", fontWeight = FontWeight.Bold)
+                Text(
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(scan.createdAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                scan.categoria?.let {
+                    Text("Categoría: ${categoryLabel(it)}", style = MaterialTheme.typography.bodySmall)
+                }
+                scan.lastError?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+            IconButton(onClick = onDiscard) {
+                Icon(Icons.Filled.Delete, contentDescription = "Descartar foto pendiente")
+            }
+        }
     }
 }
 

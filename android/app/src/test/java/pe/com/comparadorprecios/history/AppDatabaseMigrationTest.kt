@@ -14,7 +14,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import pe.com.comparadorprecios.data.Identification
+import pe.com.comparadorprecios.pending.PendingScanRepository
 import pe.com.comparadorprecios.shopping.ShoppingListRepository
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class)
@@ -49,7 +51,7 @@ class AppDatabaseMigrationTest {
         }
 
         db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         val history = HistoryRepository(db!!.historyDao())
@@ -61,5 +63,11 @@ class AppDatabaseMigrationTest {
         history.saveCheck(scans[0].id, emptyList())
         ShoppingListRepository(db!!.shoppingDao()).add(Identification("Gloria", "Leche", "400g", "abarrotes", 0.9), emptyList())
         assertTrue(db!!.shoppingDao().getAll().isNotEmpty())
+
+        // v3: la cola sin conexión queda disponible sin perder lo anterior.
+        PendingScanRepository(db!!.pendingScanDao(), File(context.cacheDir, "pending-migration-test"))
+            .enqueue("data:image/jpeg;base64,ABC", null, categoria = null)
+        assertTrue(db!!.pendingScanDao().getAll().isNotEmpty())
+        assertEquals(1, history.all.first().size)
     }
 }

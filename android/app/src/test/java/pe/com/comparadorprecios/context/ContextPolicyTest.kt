@@ -13,25 +13,32 @@ class ContextPolicyTest {
     fun `wifi con bateria normal escanea a resolucion completa sin avisos`() {
         val policy = ContextPolicy.decide(wifiFullBattery)
 
-        assertTrue(policy.canScan)
+        assertFalse(policy.offline)
         assertEquals(ContextPolicy.FULL_IMAGE_SIDE_PX, policy.maxImageSidePx)
         assertFalse(policy.saveBattery)
         assertTrue(policy.notices.isEmpty())
     }
 
     @Test
-    fun `sin red no deja escanear y solo muestra el aviso de conexion`() {
+    fun `sin red se marca offline y se avisa que la foto quedara pendiente`() {
         val policy = ContextPolicy.decide(wifiFullBattery.copy(network = NetworkType.NONE, batteryPercent = 5))
 
-        assertFalse(policy.canScan)
+        assertTrue(policy.offline)
         assertEquals(listOf(ContextPolicy.NOTICE_OFFLINE), policy.notices)
+    }
+
+    @Test
+    fun `sin red la foto se toma a resolucion completa para no degradarla antes de enviarla`() {
+        val policy = ContextPolicy.decide(wifiFullBattery.copy(network = NetworkType.NONE))
+
+        assertEquals(ContextPolicy.FULL_IMAGE_SIDE_PX, policy.maxImageSidePx)
     }
 
     @Test
     fun `datos moviles reducen la resolucion de la foto`() {
         val policy = ContextPolicy.decide(wifiFullBattery.copy(network = NetworkType.METERED))
 
-        assertTrue(policy.canScan)
+        assertFalse(policy.offline)
         assertEquals(ContextPolicy.REDUCED_IMAGE_SIDE_PX, policy.maxImageSidePx)
         assertEquals(listOf(ContextPolicy.NOTICE_METERED), policy.notices)
     }

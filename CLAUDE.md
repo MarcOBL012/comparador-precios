@@ -23,7 +23,8 @@ CONTEXTO → PROCESAMIENTO → DECISIÓN → ADAPTACIÓN
 2. **Procesamiento**: compresión en hilo de fondo (1600 px en wifi, 1024 px con datos móviles o
    batería baja); backend identifica con Gemini (`categoria` fija + `tipo`) y consulta tiendas.
 3. **Decisión**:
-   - `ContextPolicy.decide` (Android): sin red → no escanea; datos móviles/batería → foto liviana.
+   - `ContextPolicy.decide` (Android): sin red → `offline` (la foto se toma igual y se encola, ver
+     modo SIN CONEXIÓN abajo); datos móviles/batería → foto liviana.
    - `confianza < 0.5` → no se consultan tiendas ([lib/scanHandler.ts](lib/scanHandler.ts)).
    - `routeFor` en [lib/searchStores.ts](lib/searchStores.ts): la categoría decide qué tiendas se
      consultan (supermercados vs. tiendas por departamento + Google Shopping vía Serper). Si la
@@ -32,7 +33,26 @@ CONTEXTO → PROCESAMIENTO → DECISIÓN → ADAPTACIÓN
    - [lib/matching.ts](lib/matching.ts): descarta otra marca, otro código de modelo, otro `tipo`
      (leche UHT ≠ evaporada) y packs no pedidos; categoría de la tienda desempata.
 4. **Adaptación**: `ScanUiState` cambia solo; avisos de contexto en vivo en la cámara (demo:
-   modo avión y el botón se bloquea solo).
+   modo avión y la app cambia sola a modo SIN CONEXIÓN).
+
+## Modo SIN CONEXIÓN (requisito del taller)
+
+Sin internet la cámara **no se bloquea**: la foto se guarda y se procesa sola al volver la red.
+
+- `pending/PendingScanRepository`: encola la foto. La imagen va a un archivo en
+  `filesDir/pending-scans/` y en Room queda solo la ruta — una data URI pesa ~3 MB y SQLite en
+  Android corta las filas de más de ~2 MB (`CursorWindow`), así que guardarla en la tabla
+  reventaría en runtime.
+- Sin red **no se llama ni a Gemini ni a las tiendas**: `MainActivity` bifurca antes de la red
+  según `policy.offline`.
+- `pending/PendingScanProcessor`: al volver la conexión identifica cada foto, compara precios y la
+  mueve al historial conservando la fecha original de la foto. Si la red se vuelve a caer, corta y
+  deja la cola intacta; si el backend rechaza una foto, la marca con el error y sigue con el resto.
+- Disparo automático: `LaunchedEffect(policy.offline)` en `MainActivity` (también corre al abrir la
+  app, por si quedaron pendientes de una sesión anterior). Los pendientes se ven y se pueden
+  procesar a mano o descartar desde la pestaña Historial.
+- Limitación conocida: el procesamiento ocurre con la app abierta. Hacerlo con la app cerrada
+  exigiría WorkManager + token de Clerk en segundo plano.
 
 ## Mapa "si quiero cambiar X, toco Y"
 
@@ -44,6 +64,7 @@ CONTEXTO → PROCESAMIENTO → DECISIÓN → ADAPTACIÓN
 | Qué tiendas por categoría | `ROUTES` en [lib/searchStores.ts](lib/searchStores.ts) |
 | Agregar una tienda VTEX | archivo nuevo en `lib/stores/` + entrada en `DIRECT_STORES` y `ROUTES` de `lib/searchStores.ts` |
 | Reglas de red/batería | `ContextPolicy` en `android/.../context/DeviceContext.kt` |
+| Cola sin conexión | `android/.../pending/` (repo, procesador) + `ui/PendingScansViewModel.kt` |
 | Colores de la app | `android/.../ui/Theme.kt` (verde = ahorro, naranja = acción, rojo = subió) |
 | Probar búsqueda real sin IA | `npx tsx scripts/verify-stores.ts` (con `SERPER_API_KEY` en el entorno para Google Shopping) |
 | Pantallas / textos | [android/app/src/main/java/pe/com/comparadorprecios/ui/Screens.kt](android/app/src/main/java/pe/com/comparadorprecios/ui/Screens.kt) |
