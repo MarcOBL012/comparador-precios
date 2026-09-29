@@ -107,6 +107,17 @@ describe('pickBestMatch', () => {
     expect(pickBestMatch(query, candidates)).toEqual(candidates[0]);
   });
 
+  it('ignora "helado" al exigir el tipo: la tienda real dice "Té Negro", no "té helado"', () => {
+    // Caso real: Plaza Vea y Aje Perú listan este producto sin decir "helado" en ningún lado.
+    const query = { marca: 'Free Tea', nombre: 'Frutos Rojos', presentacion: '500ml', categoria: 'bebidas', tipo: 'té helado' };
+    const candidates = [
+      { productName: 'Té Negro FREE TEA Frutos Rojos Botella 500ml', brand: '' },
+      { productName: 'Free Tea Té negro Sabor a Frutos Rojos 500ml', brand: '' },
+    ];
+
+    expect(pickBestMatch(query, candidates)).toEqual(candidates[0]);
+  });
+
   it('si el tipo trae más de 2 palabras (Gemini se excedió), solo exige que calce la principal', () => {
     // "té listo para tomar" en vez de "té": ningún título de tienda repite "listo para tomar" tal cual.
     const query = { marca: 'Free Tea', nombre: 'Frutos Rojos', presentacion: '500ml', categoria: 'bebidas', tipo: 'té listo para tomar' };
