@@ -110,6 +110,7 @@ fun ScanScreen(
     }
 
     var camera by remember { mutableStateOf<Camera?>(null) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     LaunchedEffect(previewView) {
         val provider = ProcessCameraProvider.getInstance(context).get()
         val preview = Preview.Builder().build().also {
@@ -117,12 +118,15 @@ fun ScanScreen(
         }
         provider.unbindAll()
         camera = provider.bindToLifecycle(lifecycle, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+        cameraProvider = provider
     }
     // La cámara queda atada al lifecycle de la Activity, no al de este composable: si se sale de
-    // esta pantalla (p.ej. justo después de capturar) con el flash prendido, sin esto se queda
-    // encendido porque la sesión de cámara sigue viva aunque ScanScreen ya no esté en pantalla.
-    DisposableEffect(camera) {
-        onDispose { camera?.cameraControl?.enableTorch(false) }
+    // esta pantalla (p.ej. justo después de capturar, mientras se analiza con Gemini) con el
+    // flash prendido, apagar solo el torch no basta — una última lectura del sensor de luz puede
+    // llegar justo al cerrar y volver a prenderlo antes de que el composable termine de
+    // desmontarse. unbindAll() cierra la sesión de cámara por completo: ya no hay flash que prender.
+    DisposableEffect(cameraProvider) {
+        onDispose { cameraProvider?.unbindAll() }
     }
 
     // Asistente de captura (Taller 2): acelerómetro + sensor de luz deciden en conjunto si el
