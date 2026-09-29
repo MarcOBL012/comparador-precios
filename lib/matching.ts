@@ -110,13 +110,22 @@ const SYNONYM_GROUPS = [
   ['agua', 'water'],
 ].map((group) => new Set(group));
 
+// Calificativos de temperatura/forma de consumo: casi nunca se repiten igual en un título de
+// tienda ("Té Negro FREE TEA..." en vez de "té helado") y casi nunca distinguen un producto
+// distinto (a diferencia de "leche evaporada" vs "leche UHT", que sí son productos distintos).
+// Se ignoran al exigir que el tipo calce, en vez de rechazar el match por una palabra de más.
+const SOFT_TYPE_WORDS = new Set(['helado', 'helada', 'frio', 'fria', 'listo', 'lista', 'tomar', 'natural']);
+
 function isOfType(tipo: string, candidateTokens: Set<string>): boolean {
   const candidateStems = new Set([...candidateTokens].map(stem));
   const matches = (token: string): boolean => {
     const equivalents = SYNONYM_GROUPS.find((group) => group.has(token)) ?? new Set([token]);
     return [...equivalents].some((word) => candidateStems.has(word));
   };
-  const palabras = [...wordStems(tipo)];
+  const palabras = [...wordStems(tipo)].filter((token) => !SOFT_TYPE_WORDS.has(token));
+  if (palabras.length === 0) {
+    return true; // tipo era solo calificativos blandos (raro) — no rechazar por eso.
+  }
   // El prompt le pide a Gemini como máximo 2 palabras para `tipo`; cuando de verdad son 1-2
   // (el caso normal, "leche evaporada", "celular"), TODAS deben calzar — es lo que distingue
   // productos parecidos. Si un modelo de IA se excede del límite, exigir todas las palabras
