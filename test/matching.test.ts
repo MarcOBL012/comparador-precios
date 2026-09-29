@@ -107,6 +107,21 @@ describe('pickBestMatch', () => {
     expect(pickBestMatch(query, candidates)).toEqual(candidates[0]);
   });
 
+  it('si el tipo trae más de 2 palabras (Gemini se excedió), solo exige que calce la principal', () => {
+    // "té listo para tomar" en vez de "té": ningún título de tienda repite "listo para tomar" tal cual.
+    const query = { marca: 'Free Tea', nombre: 'Frutos Rojos', presentacion: '500ml', categoria: 'bebidas', tipo: 'té listo para tomar' };
+    const candidates = [{ productName: 'Free Tea Frutos Rojos 500ml', brand: '' }];
+
+    expect(pickBestMatch(query, candidates)).toEqual(candidates[0]);
+  });
+
+  it('con tipo de más de 2 palabras, igual rechaza si ni la palabra principal calza', () => {
+    const query = { marca: 'Samsung', nombre: 'Galaxy A15', presentacion: '128GB', categoria: 'tecnologia', tipo: 'celular usado reacondicionado' };
+    const candidates = [{ productName: 'Case Samsung Galaxy A15 Transparente', brand: 'Samsung' }];
+
+    expect(pickBestMatch(query, candidates)).toBeNull();
+  });
+
   it('descarta un candidato con otro código de modelo', () => {
     const query = { marca: 'Logitech', nombre: 'Mouse inalámbrico M190', presentacion: '', categoria: 'tecnologia', tipo: 'mouse' };
     const candidates = [
