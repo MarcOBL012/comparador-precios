@@ -1,4 +1,5 @@
 import { CATEGORIAS, type Categoria, type ProductQuery } from './productIdentification.js';
+import { buscarLinkComoUltimoRecurso } from './stores/googleSearch.js';
 import { buscarEnGoogleShopping } from './stores/googleShopping.js';
 import { buscarMetro } from './stores/metro.js';
 import { buscarOechsle } from './stores/oechsle.js';
@@ -78,6 +79,24 @@ export interface StoreSearchResult {
   busquedaWeb: WebSearchStatus;
 }
 
+/**
+ * Google Shopping primero (precio estructurado); si no encuentra nada, una búsqueda web normal
+ * como último recurso, solo para dar un link en vez de dejar el escaneo sin nada (ver
+ * lib/stores/googleSearch.ts). Un error en cualquiera de las dos marca 'error' — igual que antes.
+ */
+async function searchWeb(query: ProductQuery, tiendasExcluidas: string[], apiKey: string): Promise<StoreResult[] | null> {
+  try {
+    const shopping = await buscarEnGoogleShopping(query, { apiKey, excluir: tiendasExcluidas });
+    if (shopping.length > 0) {
+      return shopping;
+    }
+    return await buscarLinkComoUltimoRecurso(query, { apiKey, excluir: tiendasExcluidas });
+  } catch (err) {
+    console.error('Búsqueda web (Serper) falló:', err);
+    return null;
+  }
+}
+
 async function searchDirect(tienda: string, query: ProductQuery): Promise<StoreResult> {
   try {
     const match = await DIRECT_STORES[tienda](query);
@@ -115,14 +134,7 @@ export async function searchStores(
 
   const [directas, web] = await Promise.all([
     Promise.all(route.tiendas.map((tienda) => searchDirect(tienda, query))),
-    busquedaWeb === 'realizada'
-      ? buscarEnGoogleShopping(query, { apiKey: serperApiKey!, excluir: route.tiendas }).catch(
-          (err: unknown) => {
-            console.error('Google Shopping (Serper) falló:', err);
-            return null;
-          }
-        )
-      : Promise.resolve([]),
+    busquedaWeb === 'realizada' ? searchWeb(query, route.tiendas, serperApiKey!) : Promise.resolve([]),
   ]);
 
   if (web === null) {

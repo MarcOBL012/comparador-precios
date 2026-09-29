@@ -100,6 +100,13 @@ describe('pickBestMatch', () => {
     expect(pickBestMatch(query, candidates)).toEqual(candidates[0]);
   });
 
+  it('acepta el empaque en inglés cuando Gemini describe el tipo en español (Free Tea / té)', () => {
+    const query = { marca: 'AJE', nombre: 'Free Tea Frutos Rojos', presentacion: '500ml', categoria: 'bebidas', tipo: 'té' };
+    const candidates = [{ productName: 'AJE Free Tea Frutos Rojos 500ml', brand: '' }];
+
+    expect(pickBestMatch(query, candidates)).toEqual(candidates[0]);
+  });
+
   it('descarta un candidato con otro código de modelo', () => {
     const query = { marca: 'Logitech', nombre: 'Mouse inalámbrico M190', presentacion: '', categoria: 'tecnologia', tipo: 'mouse' };
     const candidates = [
