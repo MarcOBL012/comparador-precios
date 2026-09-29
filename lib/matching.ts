@@ -103,6 +103,11 @@ const SYNONYM_GROUPS = [
   ['laptop', 'notebook', 'portatil'],
   ['televisor', 'tv', 'television'],
   ['parlante', 'altavoz', 'speaker'],
+  // Muchas bebidas venden su empaque en inglés ("Free Tea") aunque Gemini describa el tipo en
+  // español ("té helado"): sin este grupo, "te" (de Gemini) nunca calza con "tea" (del empaque).
+  ['te', 'tea'],
+  ['jugo', 'juice'],
+  ['agua', 'water'],
 ].map((group) => new Set(group));
 
 function isOfType(tipo: string, candidateTokens: Set<string>): boolean {

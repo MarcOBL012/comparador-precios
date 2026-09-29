@@ -42,11 +42,16 @@ data class StoreResult(
     val precio: Double? = null,
     val url: String? = null,
     val mensaje: String? = null,
-    /** "web" = precio visto en Google Shopping; null = consultado directo a la tienda. */
+    /**
+     * "web" = precio visto en Google Shopping. "busqueda_web" = último recurso: un link de una
+     * búsqueda normal, SIN precio confirmado (ver lib/stores/googleSearch.ts en el backend).
+     * null = consultado directo a la tienda.
+     */
     val fuente: String? = null,
 ) {
     val isFound: Boolean get() = estado == "encontrado"
     val isFromWeb: Boolean get() = fuente == "web"
+    val isFromWebSearchFallback: Boolean get() = fuente == "busqueda_web"
 }
 
 @Serializable

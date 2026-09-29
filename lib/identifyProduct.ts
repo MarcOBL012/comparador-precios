@@ -16,7 +16,7 @@ Analiza la imagen con cuidado, incluso si el texto es pequeño o la marca es loc
   "cuidado_personal" (higiene, cosmética, farmacia), "tecnologia" (cómputo, celulares, audio, videojuegos),
   "electrohogar" (electrodomésticos), "hogar" (muebles, decoración, cocina), "ferreteria" (herramientas, construcción),
   "moda" (ropa, calzado, accesorios), "juguetes", "otros".
-- tipo: qué producto es, en 1 o 2 palabras en español, sin marca, modelo ni variante: lo mínimo que lo distingue de productos parecidos. Ej. "leche evaporada" (no solo "leche", porque la leche UHT es otro producto), "mouse", "audífonos", "licuadora", "detergente" (no "detergente en polvo").
+- tipo: qué producto es, EXACTAMENTE 1 o 2 palabras en español, sin marca, modelo ni variante: lo mínimo que lo distingue de productos parecidos, nada más. Esto se compara palabra por palabra contra el título en las tiendas, así que una palabra de más (que la tienda no repita) hace que no se encuentre nada. Ej. "leche evaporada" (no solo "leche", porque la leche UHT es otro producto), "té helado" (no "té listo para tomar"), "mouse", "audífonos", "licuadora", "detergente" (no "detergente en polvo" ni "detergente para ropa").
 - confianza: un número entre 0 y 1. Bájalo SOLO por problemas de la propia foto (borrosa, mal enfocada, empaque tapado, reflejo o ángulo que no deja leer el texto). Nunca lo bajes solo porque la marca o el producto te resulten desconocidos o poco comunes: si el texto se lee con claridad, transcríbelo tal cual y usa confianza alta aunque nunca hayas oído de esa marca antes.
 Si de verdad no puedes leer nada del empaque, usa confianza 0, categoria "otros" y deja marca, nombre, presentacion y tipo como cadenas vacías.`;
 

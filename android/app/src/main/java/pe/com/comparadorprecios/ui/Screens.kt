@@ -522,6 +522,12 @@ private fun StoreRow(result: StoreResult, summary: PriceSummary?, onOpenUrl: (St
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        } else if (result.isFromWebSearchFallback) {
+                            Text(
+                                "Enlace encontrado, sin precio confirmado",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                     "no_encontrado" -> Text("No disponible", style = MaterialTheme.typography.bodySmall)
@@ -533,26 +539,28 @@ private fun StoreRow(result: StoreResult, summary: PriceSummary?, onOpenUrl: (St
                     )
                 }
             }
-            if (result.isFound && result.precio != null) {
+            if (result.isFound && (result.precio != null || url != null)) {
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        formatSoles(result.precio),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (isBest) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    )
-                    when {
-                        isBest -> Pill(
-                            text = "MEJOR",
-                            container = MaterialTheme.colorScheme.primary,
-                            content = MaterialTheme.colorScheme.onPrimary,
+                    if (result.precio != null) {
+                        Text(
+                            formatSoles(result.precio),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isBest) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         )
-                        extra != null -> Text(
-                            "+${formatSoles(extra)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                        when {
+                            isBest -> Pill(
+                                text = "MEJOR",
+                                container = MaterialTheme.colorScheme.primary,
+                                content = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            extra != null -> Text(
+                                "+${formatSoles(extra)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                     if (url != null) {
                         Icon(

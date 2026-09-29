@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   oechsle: vi.fn(),
   promart: vi.fn(),
   googleShopping: vi.fn(),
+  googleSearch: vi.fn(),
 }));
 
 vi.mock('../lib/stores/plazaVea', () => ({ buscarPlazaVea: mocks.plazaVea }));
@@ -15,6 +16,7 @@ vi.mock('../lib/stores/metro', () => ({ buscarMetro: mocks.metro }));
 vi.mock('../lib/stores/oechsle', () => ({ buscarOechsle: mocks.oechsle }));
 vi.mock('../lib/stores/promart', () => ({ buscarPromart: mocks.promart }));
 vi.mock('../lib/stores/googleShopping', () => ({ buscarEnGoogleShopping: mocks.googleShopping }));
+vi.mock('../lib/stores/googleSearch', () => ({ buscarLinkComoUltimoRecurso: mocks.googleSearch }));
 
 import { parseDeviceContext, routeFor, searchStores } from '../lib/searchStores';
 import type { ProductQuery } from '../lib/productIdentification';
@@ -60,6 +62,7 @@ describe('searchStores', () => {
       mock.mockResolvedValue(null);
     }
     mocks.googleShopping.mockResolvedValue([WEB_OFFER]);
+    mocks.googleSearch.mockResolvedValue([]);
   });
 
   it('consulta solo los supermercados para abarrotes y no gasta la búsqueda web', async () => {
@@ -86,6 +89,7 @@ describe('searchStores', () => {
     expect(result.tiendas.map((t) => t.tienda)).toEqual(['Plaza Vea', 'Oechsle', 'Promart', 'Sodimac']);
     expect(mocks.googleShopping).toHaveBeenCalledWith(MOUSE, { apiKey: 'key', excluir: ['Plaza Vea', 'Oechsle', 'Promart'] });
     expect(mocks.wong).not.toHaveBeenCalled();
+    expect(mocks.googleSearch).not.toHaveBeenCalled();
   });
 
   it('si la categoría elegida no coincide con la identificada, busca en las tiendas de ambas', async () => {
@@ -112,6 +116,48 @@ describe('searchStores', () => {
 
   it('si la búsqueda web falla, devuelve igual las tiendas directas', async () => {
     mocks.googleShopping.mockRejectedValue(new Error('403'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await searchStores(MOUSE, NORMAL, { serperApiKey: 'key' });
+
+    expect(result.busquedaWeb).toBe('error');
+    expect(result.tiendas).toHaveLength(3);
+    expect(mocks.googleSearch).not.toHaveBeenCalled();
+  });
+
+  it('si Shopping no encuentra nada, intenta una búsqueda web normal como último recurso', async () => {
+    mocks.googleShopping.mockResolvedValue([]);
+    mocks.googleSearch.mockResolvedValue([
+      { tienda: 'Tottus', estado: 'encontrado', producto: 'Mouse Logitech M190', url: 'https://tottus.pe/p/1', fuente: 'busqueda_web' },
+    ]);
+
+    const result = await searchStores(MOUSE, NORMAL, { serperApiKey: 'key' });
+
+    expect(result.busquedaWeb).toBe('realizada');
+    expect(result.tiendas.map((t) => t.tienda)).toEqual(['Plaza Vea', 'Oechsle', 'Promart', 'Tottus']);
+    expect(result.tiendas.at(-1)).toEqual({
+      tienda: 'Tottus',
+      estado: 'encontrado',
+      producto: 'Mouse Logitech M190',
+      url: 'https://tottus.pe/p/1',
+      fuente: 'busqueda_web',
+    });
+    expect(mocks.googleSearch).toHaveBeenCalledWith(MOUSE, { apiKey: 'key', excluir: ['Plaza Vea', 'Oechsle', 'Promart'] });
+  });
+
+  it('si ni Shopping ni el último recurso encuentran nada, solo quedan las tiendas directas', async () => {
+    mocks.googleShopping.mockResolvedValue([]);
+    mocks.googleSearch.mockResolvedValue([]);
+
+    const result = await searchStores(MOUSE, NORMAL, { serperApiKey: 'key' });
+
+    expect(result.busquedaWeb).toBe('realizada');
+    expect(result.tiendas.map((t) => t.tienda)).toEqual(['Plaza Vea', 'Oechsle', 'Promart']);
+  });
+
+  it('si el último recurso falla, se marca error pero las tiendas directas se devuelven igual', async () => {
+    mocks.googleShopping.mockResolvedValue([]);
+    mocks.googleSearch.mockRejectedValue(new Error('timeout'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await searchStores(MOUSE, NORMAL, { serperApiKey: 'key' });
