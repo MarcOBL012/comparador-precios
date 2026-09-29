@@ -118,6 +118,12 @@ fun ScanScreen(
         provider.unbindAll()
         camera = provider.bindToLifecycle(lifecycle, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
     }
+    // La cámara queda atada al lifecycle de la Activity, no al de este composable: si se sale de
+    // esta pantalla (p.ej. justo después de capturar) con el flash prendido, sin esto se queda
+    // encendido porque la sesión de cámara sigue viva aunque ScanScreen ya no esté en pantalla.
+    DisposableEffect(camera) {
+        onDispose { camera?.cameraControl?.enableTorch(false) }
+    }
 
     // Asistente de captura (Taller 2): acelerómetro + sensor de luz deciden en conjunto si el
     // teléfono está listo para la foto, y accionan flash + vibración solos, sin tocar la pantalla.
