@@ -23,14 +23,18 @@ interface Route {
   web: boolean;
 }
 
+// Solo "abarrotes" fue verificado sin resultados en Google Shopping Perú. Bebidas/limpieza/cuidado
+// personal SÍ consultan Serper: una marca local que ninguna de las tres cadenas tiene en su catálogo
+// (ej. una bebida que solo vende una tienda pequeña) igual debe aparecer con lo que salga ahí.
 const SUPERMERCADOS: Route = { tiendas: ['Plaza Vea', 'Wong', 'Metro'], web: false };
+const SUPERMERCADOS_CON_WEB: Route = { tiendas: ['Plaza Vea', 'Wong', 'Metro'], web: true };
 const TIENDAS_POR_DEPARTAMENTO: Route = { tiendas: ['Plaza Vea', 'Oechsle', 'Promart'], web: true };
 
 export const ROUTES: Record<Categoria, Route> = {
   abarrotes: SUPERMERCADOS,
-  bebidas: SUPERMERCADOS,
-  limpieza: SUPERMERCADOS,
-  cuidado_personal: SUPERMERCADOS,
+  bebidas: SUPERMERCADOS_CON_WEB,
+  limpieza: SUPERMERCADOS_CON_WEB,
+  cuidado_personal: SUPERMERCADOS_CON_WEB,
   tecnologia: TIENDAS_POR_DEPARTAMENTO,
   electrohogar: TIENDAS_POR_DEPARTAMENTO,
   hogar: { tiendas: ['Promart', 'Oechsle', 'Plaza Vea'], web: true },

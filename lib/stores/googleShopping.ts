@@ -64,15 +64,35 @@ export function displayName(sources: string[]): string {
     .trim();
 }
 
-export async function buscarEnGoogleShopping(
-  identification: ProductQuery,
-  { apiKey, excluir, limite = 3, timeoutMs = 8000 }: GoogleShoppingOptions
-): Promise<StoreResult[]> {
-  const q = `${identification.marca} ${identification.nombre} ${identification.presentacion}`.trim();
+/**
+ * Frases a probar en Serper, de la más específica a la más amplia. Un producto poco común
+ * (marca local, empaque que Google no indexó tal cual) puede no aparecer con la frase exacta
+ * pero sí con una más corta — probamos varias en vez de rendirnos con la primera vacía.
+ * Se deduplica: si presentación/tipo están vacíos, no se repite la misma consulta dos veces.
+ */
+export function queryVariants(identification: ProductQuery): string[] {
+  const variants: string[] = [];
+  const add = (raw: string) => {
+    const q = raw.trim().replace(/\s+/g, ' ');
+    if (q && !variants.includes(q)) {
+      variants.push(q);
+    }
+  };
+  // 1. La más específica: marca + nombre (ya trae sabor/color/modelo, ver prompt de Gemini) + presentación.
+  add(`${identification.marca} ${identification.nombre} ${identification.presentacion}`);
+  // 2. Sin presentación: el tamaño exacto a veces no calza con cómo lo lista la tienda.
+  add(`${identification.marca} ${identification.nombre}`);
+  // 3. Última red: marca + lo mínimo que distingue el producto, por si el nombre completo
+  //    (con una variante o sabor poco común) es justo lo que Google no tiene indexado.
+  if (identification.tipo) {
+    add(`${identification.marca} ${identification.tipo}`);
+  }
+  return variants;
+}
 
+async function fetchShoppingItems(q: string, apiKey: string, timeoutMs: number): Promise<SerperShoppingItem[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let items: SerperShoppingItem[];
   try {
     const response = await fetch(SERPER_SHOPPING_URL, {
       method: 'POST',
@@ -84,12 +104,18 @@ export async function buscarEnGoogleShopping(
       throw new Error(`Serper respondió con estado ${response.status}`);
     }
     const body = (await response.json()) as { shopping?: SerperShoppingItem[] };
-    items = Array.isArray(body.shopping) ? body.shopping : [];
+    return Array.isArray(body.shopping) ? body.shopping : [];
   } finally {
     clearTimeout(timeout);
   }
+}
 
-  const excluded = excluir.map(storeKey);
+function matchItems(
+  identification: ProductQuery,
+  items: SerperShoppingItem[],
+  excluded: string[],
+  limite: number
+): StoreResult[] {
   const bySource = new Map<string, { sources: string[]; candidates: ShoppingCandidate[] }>();
   for (const item of items) {
     const precio = parseSoles(item.price);
@@ -128,4 +154,32 @@ export async function buscarEnGoogleShopping(
   }
 
   return [...cheapestByName.values()].sort((a, b) => a.precio! - b.precio!).slice(0, limite);
+}
+
+export async function buscarEnGoogleShopping(
+  identification: ProductQuery,
+  { apiKey, excluir, limite = 3, timeoutMs = 8000 }: GoogleShoppingOptions
+): Promise<StoreResult[]> {
+  const excluded = excluir.map(storeKey);
+  let lastError: unknown = null;
+
+  for (const q of queryVariants(identification)) {
+    try {
+      const items = await fetchShoppingItems(q, apiKey, timeoutMs);
+      const matched = matchItems(identification, items, excluded, limite);
+      if (matched.length > 0) {
+        return matched;
+      }
+      // Serper respondió pero nada calzó: no es un error, solo esta frase no encontró nada. Seguir probando.
+      lastError = null;
+    } catch (err) {
+      // Un timeout o error puntual en una variante no debe tumbar la búsqueda si otra variante funciona.
+      lastError = err;
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+  return [];
 }

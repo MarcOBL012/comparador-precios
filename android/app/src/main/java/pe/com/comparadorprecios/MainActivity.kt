@@ -52,6 +52,8 @@ import pe.com.comparadorprecios.ui.LoadingScreen
 import pe.com.comparadorprecios.ui.LowConfidenceScreen
 import pe.com.comparadorprecios.ui.OnboardingScreen
 import pe.com.comparadorprecios.ui.PendingScansViewModel
+import pe.com.comparadorprecios.ui.ProductConfirmationCard
+import pe.com.comparadorprecios.ui.ProductConfirmationViewModel
 import pe.com.comparadorprecios.ui.ResultScreen
 import pe.com.comparadorprecios.ui.ScanScreen
 import pe.com.comparadorprecios.ui.ScanUiState
@@ -167,6 +169,7 @@ class MainActivity : ComponentActivity() {
                                         var captureError by remember { mutableStateOf<String?>(null) }
                                         var manualName by remember { mutableStateOf("") }
                                         var pendingThumbnail by remember { mutableStateOf<ByteArray?>(null) }
+                                        var lastSavedScanId by remember { mutableStateOf<Long?>(null) }
 
                                         when (val s = state) {
                                             is ScanUiState.Idle -> {
@@ -218,6 +221,23 @@ class MainActivity : ComponentActivity() {
                                                         snackbar.showSnackbar("Producto agregado a tu lista de compras")
                                                     }
                                                 },
+                                                extraContent = {
+                                                    val scanId = lastSavedScanId
+                                                    if (scanId != null) {
+                                                        item(key = "confirmation") {
+                                                            val confirmVm: ProductConfirmationViewModel = viewModel(key = "confirm-$scanId") {
+                                                                ProductConfirmationViewModel(
+                                                                    scanId = scanId,
+                                                                    identification = s.identification,
+                                                                    saveBattery = policy.saveBattery,
+                                                                    historyRepository = historyRepository,
+                                                                    scanRepository = repository,
+                                                                )
+                                                            }
+                                                            ProductConfirmationCard(confirmVm)
+                                                        }
+                                                    }
+                                                },
                                             )
                                             is ScanUiState.Error -> ErrorScreen(
                                                 message = s.message,
@@ -233,8 +253,12 @@ class MainActivity : ComponentActivity() {
                                                 if (thumbnail != null) {
                                                     runCatching {
                                                         historyRepository.save(s.identification, s.tiendas, thumbnail)
-                                                    }
+                                                    }.onSuccess { id -> lastSavedScanId = id }
                                                 }
+                                            } else if (s is ScanUiState.Idle) {
+                                                // Escaneo nuevo: que la tarjeta de confirmación no siga
+                                                // apuntando al scanId del producto anterior.
+                                                lastSavedScanId = null
                                             }
                                         }
                                     }

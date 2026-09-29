@@ -114,6 +114,41 @@ class HistoryRepositoryTest {
     }
 
     @Test
+    fun `findConfirmedMatch es null hasta que se confirma el mismo producto`() = runTest {
+        val id = repo.save(identification, tiendas, byteArrayOf(1))
+
+        assertNull(repo.findConfirmedMatch(identification))
+
+        repo.confirm(id)
+
+        val match = repo.findConfirmedMatch(identification)
+        assertEquals(id, match?.id)
+    }
+
+    @Test
+    fun `findConfirmedMatch exige marca, nombre y tipo iguales, no solo parecidos`() = runTest {
+        val id = repo.save(identification, tiendas, byteArrayOf(1))
+        repo.confirm(id)
+
+        val otraPresentacion = identification.copy(presentacion = "1L")
+        assertEquals(id, repo.findConfirmedMatch(otraPresentacion)?.id)
+
+        val otroProducto = identification.copy(nombre = "Leche UHT")
+        assertNull(repo.findConfirmedMatch(otroProducto))
+    }
+
+    @Test
+    fun `saveCorrection guarda la nota sin afectar la confirmacion`() = runTest {
+        val id = repo.save(identification, tiendas, byteArrayOf(1))
+
+        repo.saveCorrection(id, "Era Gloria Leche UHT, no evaporada · Link: https://ejemplo.pe/producto")
+
+        assertNull(repo.findConfirmedMatch(identification))
+        repo.confirm(id)
+        assertEquals(id, repo.findConfirmedMatch(identification)?.id)
+    }
+
+    @Test
     fun `save con precio null deja bestPrice en null`() = runTest {
         repo.save(
             identification,

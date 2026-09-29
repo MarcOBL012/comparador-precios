@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Button
@@ -36,12 +38,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -260,6 +265,124 @@ fun ResultScreen(
                     Icon(Icons.Filled.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(newScanLabel)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ADAPTACIÓN: pide confirmar si el resultado era el producto correcto. "Sí" lo marca como
+ * confirmado (referencia para la próxima vez que se escanee lo mismo, ver
+ * [ProductConfirmationViewModel.previousConfirmedMatch]); "No" pide un nombre completo o link y
+ * reintenta la búsqueda con eso. Autocontenido: solo depende del ViewModel, no del estado de
+ * ResultScreen, para poder insertarse vía `extraContent` sin tocar su firma.
+ */
+@Composable
+fun ProductConfirmationCard(viewModel: ProductConfirmationViewModel) {
+    val state by viewModel.state.collectAsState()
+    val previousMatch by viewModel.previousConfirmedMatch.collectAsState()
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val match = previousMatch
+        if (match != null) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Ya confirmaste este producto antes" +
+                            (match.bestPrice?.let { " — ${formatSoles(it)} en un escaneo previo" } ?: "") +
+                            ". Puede estar desactualizado.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (val s = state) {
+                    ConfirmationState.Asking -> {
+                        Text(
+                            "¿Es este el producto que buscabas?",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = viewModel::confirmCorrect, modifier = Modifier.weight(1f)) {
+                                Text("Sí, es este")
+                            }
+                            OutlinedButton(onClick = viewModel::showCorrectionForm, modifier = Modifier.weight(1f)) {
+                                Text("No es este")
+                            }
+                        }
+                    }
+                    ConfirmationState.Confirmed -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("¡Gracias! Guardamos que este resultado es correcto.", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    ConfirmationState.CorrectionForm -> {
+                        var nombre by remember { mutableStateOf("") }
+                        var link by remember { mutableStateOf("") }
+                        Text("Ayúdanos a encontrarlo", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        OutlinedTextField(
+                            value = nombre,
+                            onValueChange = { nombre = it },
+                            label = { Text("Nombre completo del producto") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = link,
+                            onValueChange = { link = it },
+                            label = { Text("Link directo (opcional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.submitCorrection(nombre, link) },
+                                enabled = nombre.isNotBlank() || link.isNotBlank(),
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Buscar de nuevo") }
+                            OutlinedButton(onClick = viewModel::cancelCorrection, modifier = Modifier.weight(1f)) {
+                                Text("Cancelar")
+                            }
+                        }
+                    }
+                    ConfirmationState.SearchingCorrection -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Buscando de nuevo con ese nombre…", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    is ConfirmationState.CorrectionResult -> {
+                        Text("Guardamos tu corrección.", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        val encontrados = s.tiendas.filter { it.isFound }
+                        if (encontrados.isNotEmpty()) {
+                            Text("Encontramos esto con el nombre que diste:", style = MaterialTheme.typography.bodySmall)
+                            encontrados.forEach { tienda ->
+                                Text(
+                                    "• ${tienda.tienda}: ${tienda.precio?.let(::formatSoles) ?: "—"} ${tienda.producto.orEmpty()}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        } else {
+                            Text(
+                                "Tampoco encontramos precios con ese nombre, pero guardamos tu corrección para revisarla más adelante.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    is ConfirmationState.CorrectionFailed -> {
+                        Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(onClick = viewModel::showCorrectionForm) { Text("Reintentar") }
+                    }
                 }
             }
         }

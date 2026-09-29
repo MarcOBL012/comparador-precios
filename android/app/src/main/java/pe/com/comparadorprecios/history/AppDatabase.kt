@@ -13,7 +13,7 @@ import pe.com.comparadorprecios.shopping.ShoppingItem
 
 @Database(
     entities = [ScanRecord::class, PriceCheck::class, ShoppingItem::class, PendingScan::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,9 +55,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Confirmación del producto ("¿es este?") y corrección manual cuando no lo es. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE scans ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE scans ADD COLUMN correctionNote TEXT")
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -54,6 +55,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import pe.com.comparadorprecios.capture.CaptureAction
+import pe.com.comparadorprecios.capture.CaptureAdvisor
+import pe.com.comparadorprecios.capture.CaptureConditions
+import pe.com.comparadorprecios.capture.CaptureConditionsMonitor
+import pe.com.comparadorprecios.capture.Haptics
+import pe.com.comparadorprecios.capture.Lighting
+import pe.com.comparadorprecios.capture.Steadiness
 import pe.com.comparadorprecios.context.ScanPolicy
 import pe.com.comparadorprecios.util.ImageEncoding
 import pe.com.comparadorprecios.util.ThumbnailEncoder
@@ -100,13 +109,33 @@ fun ScanScreen(
         onDispose { processingExecutor.shutdown() }
     }
 
+    var camera by remember { mutableStateOf<Camera?>(null) }
     LaunchedEffect(previewView) {
         val provider = ProcessCameraProvider.getInstance(context).get()
         val preview = Preview.Builder().build().also {
             it.setSurfaceProvider(previewView.surfaceProvider)
         }
         provider.unbindAll()
-        provider.bindToLifecycle(lifecycle, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+        camera = provider.bindToLifecycle(lifecycle, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+    }
+
+    // Asistente de captura (Taller 2): acelerómetro + sensor de luz deciden en conjunto si el
+    // teléfono está listo para la foto, y accionan flash + vibración solos, sin tocar la pantalla.
+    val captureConditionsMonitor = remember { CaptureConditionsMonitor(context) }
+    val captureConditions by remember { captureConditionsMonitor.observe() }
+        .collectAsStateWithLifecycle(initialValue = CaptureConditions(Steadiness.STEADY, Lighting.BRIGHT))
+    val captureAction = CaptureAdvisor.decide(captureConditions)
+    val captureAssistEnabled = captureConditionsMonitor.hasBothSensors
+
+    LaunchedEffect(captureAction, camera) {
+        if (captureAssistEnabled) {
+            camera?.cameraControl?.enableTorch(captureAction == CaptureAction.READY_DARK)
+        }
+    }
+    LaunchedEffect(captureAction) {
+        if (captureAssistEnabled && captureAction != CaptureAction.WAIT_STEADY) {
+            Haptics.vibrateReady(context)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -116,6 +145,12 @@ fun ScanScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ContextNotices(notices = policy.notices)
+            if (captureAssistEnabled) {
+                ContextNotices(
+                    notices = listOfNotNull(captureAdvisoryNotice(captureAction)),
+                    urgent = captureAction == CaptureAction.WAIT_STEADY,
+                )
+            }
             if (pendingCount > 0) {
                 ContextNotices(
                     notices = listOf(
@@ -170,6 +205,13 @@ fun ScanScreen(
             )
         }
     }
+}
+
+/** Texto para la etapa ADAPTACIÓN del asistente de captura; `null` = todo bien, sin nada que avisar. */
+private fun captureAdvisoryNotice(action: CaptureAction): String? = when (action) {
+    CaptureAction.WAIT_STEADY -> "Sostén firme el teléfono para una foto nítida."
+    CaptureAction.READY_DARK -> "Poca luz: flash activado automáticamente."
+    CaptureAction.READY_BRIGHT -> null
 }
 
 /** Elegir la categoría antes de la foto afina qué tiendas se consultan; "Automático" deja decidir a la IA. */
