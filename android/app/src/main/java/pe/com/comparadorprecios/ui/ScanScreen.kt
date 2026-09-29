@@ -125,7 +125,12 @@ fun ScanScreen(
     // flash prendido, apagar solo el torch no basta — una última lectura del sensor de luz puede
     // llegar justo al cerrar y volver a prenderlo antes de que el composable termine de
     // desmontarse. unbindAll() cierra la sesión de cámara por completo: ya no hay flash que prender.
-    DisposableEffect(cameraProvider) {
+    //
+    // Key = Unit a propósito, NO cameraProvider: `cameraProvider` pasa de null al proveedor real
+    // apenas se conecta la cámara (dos líneas arriba), y con ese valor como key, Compose trata
+    // ese cambio como "reiniciar el efecto" — corriendo este onDispose (que lee el valor YA
+    // actualizado de cameraProvider) justo después de conectar la cámara, apagándola al toque.
+    DisposableEffect(Unit) {
         onDispose { cameraProvider?.unbindAll() }
     }
 
