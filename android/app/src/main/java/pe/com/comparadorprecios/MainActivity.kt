@@ -42,6 +42,7 @@ import pe.com.comparadorprecios.shopping.ShoppingListRepository
 import pe.com.comparadorprecios.ui.AppBottomBar
 import pe.com.comparadorprecios.ui.AppFlowState
 import pe.com.comparadorprecios.ui.AppRoutes
+import pe.com.comparadorprecios.ui.AppTopBar
 import pe.com.comparadorprecios.ui.ComparadorTheme
 import pe.com.comparadorprecios.ui.DetailScreen
 import pe.com.comparadorprecios.ui.DetailViewModel
@@ -156,6 +157,12 @@ class MainActivity : ComponentActivity() {
                             }
 
                             Scaffold(
+                                topBar = {
+                                    AppTopBar(
+                                        navController = navController,
+                                        onSignOut = { scope.launch { Clerk.auth.signOut() } },
+                                    )
+                                },
                                 bottomBar = { AppBottomBar(navController) },
                                 snackbarHost = { SnackbarHost(snackbar) },
                             ) { padding ->

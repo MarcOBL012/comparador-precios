@@ -112,10 +112,18 @@ const SYNONYM_GROUPS = [
 
 function isOfType(tipo: string, candidateTokens: Set<string>): boolean {
   const candidateStems = new Set([...candidateTokens].map(stem));
-  return [...wordStems(tipo)].every((token) => {
+  const matches = (token: string): boolean => {
     const equivalents = SYNONYM_GROUPS.find((group) => group.has(token)) ?? new Set([token]);
     return [...equivalents].some((word) => candidateStems.has(word));
-  });
+  };
+  const palabras = [...wordStems(tipo)];
+  // El prompt le pide a Gemini como máximo 2 palabras para `tipo`; cuando de verdad son 1-2
+  // (el caso normal, "leche evaporada", "celular"), TODAS deben calzar — es lo que distingue
+  // productos parecidos. Si un modelo de IA se excede del límite, exigir todas las palabras
+  // rechazaría matches válidos por un calificativo de sobra ("listo para tomar") que ninguna
+  // tienda repite igual: ahí basta con que calce la principal (la primera).
+  const relevantes = palabras.length > 2 ? palabras.slice(0, 1) : palabras;
+  return relevantes.every(matches);
 }
 
 // Un kit "Teclado + Mouse" vive en /Teclados/ aunque su título diga "mouse": que la
