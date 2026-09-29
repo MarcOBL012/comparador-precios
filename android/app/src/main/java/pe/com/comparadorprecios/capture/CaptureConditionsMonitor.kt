@@ -68,7 +68,10 @@ class CaptureConditionsMonitor(context: Context) {
         // temblor de mano de un pulso momentáneo, sin sentirse lento en la demo.
         private const val WINDOW_SIZE = 12
         private const val SHAKE_VARIANCE_THRESHOLD = 1.2f
-        // Lux de un cuarto con poca luz/atardecer; interior bien iluminado ronda 100-300 lux.
-        private const val LOW_LUX_THRESHOLD = 30f
+        // Lux de un cuarto realmente oscuro (vela ~10 lux); un interior con luz normal ya pasa de
+        // 100 lux. Se dejó bajo a propósito: el sensor de luz de muchos teléfonos gama media/baja
+        // está mal calibrado y reporta valores bajos incluso con luz normal, lo que prendía el
+        // flash de más — si tu teléfono lo sigue activando con luz de sobra, bájalo aún más.
+        private const val LOW_LUX_THRESHOLD = 10f
     }
 }
