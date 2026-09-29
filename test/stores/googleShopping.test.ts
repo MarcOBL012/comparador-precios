@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { buscarEnGoogleShopping, displayName, parseSoles, storeKey } from '../../lib/stores/googleShopping';
+import { buscarEnGoogleShopping, displayName, parseSoles, queryVariants, storeKey } from '../../lib/stores/googleShopping';
 import type { ProductQuery } from '../../lib/productIdentification';
 
 const query: ProductQuery = { marca: 'Logitech', nombre: 'Mouse M190', presentacion: '', categoria: 'tecnologia' };
@@ -40,6 +40,28 @@ describe('displayName', () => {
 
   it('convierte un dominio en nombre cuando no hay otro', () => {
     expect(displayName(['Metro.pe'])).toBe('Metro');
+  });
+});
+
+describe('queryVariants', () => {
+  it('no repite frases cuando presentación y tipo están vacíos', () => {
+    expect(queryVariants(query)).toEqual(['Logitech Mouse M190']);
+  });
+
+  it('agrega una frase sin presentación y otra con marca + tipo, de más a menos específica', () => {
+    const identification: ProductQuery = {
+      marca: 'AJE',
+      nombre: 'Free Tea Frutos Rojos',
+      presentacion: '500ml',
+      categoria: 'bebidas',
+      tipo: 'te helado',
+    };
+
+    expect(queryVariants(identification)).toEqual([
+      'AJE Free Tea Frutos Rojos 500ml',
+      'AJE Free Tea Frutos Rojos',
+      'AJE te helado',
+    ]);
   });
 });
 
@@ -121,5 +143,43 @@ describe('buscarEnGoogleShopping', () => {
     fetchMock.mockResolvedValue(serperResponse([], false, 403));
 
     await expect(buscarEnGoogleShopping(query, OPTIONS)).rejects.toThrow('Serper respondió con estado 403');
+  });
+
+  it('si la frase específica no encuentra nada, prueba frases más amplias hasta encontrar un match', async () => {
+    const identification: ProductQuery = {
+      marca: 'AJE',
+      nombre: 'Free Tea Frutos Rojos',
+      presentacion: '500ml',
+      categoria: 'bebidas',
+      tipo: 'te helado',
+    };
+    fetchMock
+      .mockResolvedValueOnce(serperResponse([])) // "AJE Free Tea Frutos Rojos 500ml": nada
+      .mockResolvedValueOnce(serperResponse([])) // "AJE Free Tea Frutos Rojos": nada
+      .mockResolvedValueOnce(
+        serperResponse([offer('AJE Te Helado Frutos Rojos 500ml', 'Tottus', 'S/ 3.50')])
+      ); // "AJE te helado": sí
+
+    const result = await buscarEnGoogleShopping(identification, OPTIONS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.map((r) => [r.tienda, r.precio])).toEqual([['Tottus', 3.5]]);
+  });
+
+  it('un error puntual en una frase no impide que una frase posterior sí encuentre resultados', async () => {
+    const identification: ProductQuery = {
+      marca: 'AJE',
+      nombre: 'Free Tea Frutos Rojos',
+      presentacion: '500ml',
+      categoria: 'bebidas',
+      tipo: 'te helado',
+    };
+    fetchMock
+      .mockResolvedValueOnce(serperResponse([], false, 500))
+      .mockResolvedValueOnce(serperResponse([offer('AJE Te Helado Frutos Rojos 500ml', 'Tottus', 'S/ 3.50')]));
+
+    const result = await buscarEnGoogleShopping(identification, OPTIONS);
+
+    expect(result.map((r) => r.tienda)).toEqual(['Tottus']);
   });
 });

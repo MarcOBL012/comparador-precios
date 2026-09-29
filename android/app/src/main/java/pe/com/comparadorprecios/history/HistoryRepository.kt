@@ -60,6 +60,17 @@ class HistoryRepository(private val dao: HistoryDao) {
         )
     }
 
+    /** La persona confirmó "sí, es este producto" — sirve de referencia si se repite (ver [findConfirmedMatch]). */
+    suspend fun confirm(scanId: Long) = dao.markConfirmed(scanId)
+
+    /** La persona dijo "no es este" y dio el nombre completo y/o un link para ubicarlo. */
+    suspend fun saveCorrection(scanId: Long, note: String) = dao.setCorrectionNote(scanId, note)
+
+    /** Un escaneo anterior del mismo producto exacto que ya se confirmó correcto (o null si no hay). */
+    suspend fun findConfirmedMatch(identification: Identification): HistoryItem? =
+        dao.findConfirmedMatch(identification.marca, identification.nombre, identification.tipo)
+            ?.toItem(latestBestPrice = null)
+
     fun latestCheck(scanId: Long): Flow<PriceCheckSnapshot?> =
         dao.observeLatestCheck(scanId).map { check -> check?.let { PriceCheckSnapshot(it.checkedAt, StoreResultsJson.decode(it.tiendasJson)) } }
 

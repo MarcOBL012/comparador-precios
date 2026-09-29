@@ -51,7 +51,7 @@ class AppDatabaseMigrationTest {
         }
 
         db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
             .allowMainThreadQueries()
             .build()
         val history = HistoryRepository(db!!.historyDao())
@@ -69,5 +69,62 @@ class AppDatabaseMigrationTest {
             .enqueue("data:image/jpeg;base64,ABC", null, categoria = null)
         assertTrue(db!!.pendingScanDao().getAll().isNotEmpty())
         assertEquals(1, history.all.first().size)
+
+        // v4: confirmar/corregir queda disponible y no rompe lo que ya había.
+        assertTrue(history.findConfirmedMatch(scans[0].identification) == null)
+        history.confirm(scans[0].id)
+        assertTrue(history.findConfirmedMatch(scans[0].identification) != null)
+    }
+
+    @Test
+    fun `migrar de v3 a v4 conserva los escaneos y agrega confirmacion sin romper nada`() = runTest {
+        // Esquema exacto que generaba Room para la versión 3 (antes de confirmed/correctionNote).
+        context.deleteDatabase(dbName)
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(dbName), null).use { v3 ->
+            v3.execSQL(
+                "CREATE TABLE IF NOT EXISTS scans (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "createdAt INTEGER NOT NULL, marca TEXT NOT NULL, nombre TEXT NOT NULL, presentacion TEXT NOT NULL, " +
+                    "categoria TEXT NOT NULL, confianza REAL NOT NULL, tiendasJson TEXT NOT NULL, bestPrice REAL, " +
+                    "thumbnail BLOB NOT NULL, tipo TEXT NOT NULL DEFAULT '')"
+            )
+            v3.execSQL(
+                "INSERT INTO scans (createdAt, marca, nombre, presentacion, categoria, tipo, confianza, tiendasJson, bestPrice, thumbnail) " +
+                    "VALUES (1000, 'AJE', 'Free Tea Frutos Rojos', '500ml', 'bebidas', 'te helado', 0.9, '[]', 3.5, x'01')"
+            )
+            v3.execSQL(
+                "CREATE TABLE IF NOT EXISTS price_checks (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, scanId INTEGER NOT NULL, " +
+                    "checkedAt INTEGER NOT NULL, tiendasJson TEXT NOT NULL, bestPrice REAL)"
+            )
+            v3.execSQL(
+                "CREATE TABLE IF NOT EXISTS shopping_items (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, addedAt INTEGER NOT NULL, " +
+                    "marca TEXT NOT NULL, nombre TEXT NOT NULL, presentacion TEXT NOT NULL, categoria TEXT NOT NULL, tipo TEXT NOT NULL, " +
+                    "quantity INTEGER NOT NULL, tiendasJson TEXT NOT NULL, pricesUpdatedAt INTEGER NOT NULL)"
+            )
+            v3.execSQL(
+                "CREATE TABLE IF NOT EXISTS pending_scans (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, createdAt INTEGER NOT NULL, " +
+                    "imagePath TEXT NOT NULL, thumbnail BLOB, categoria TEXT, lastError TEXT)"
+            )
+            v3.version = 3
+        }
+
+        db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .allowMainThreadQueries()
+            .build()
+        val history = HistoryRepository(db!!.historyDao())
+
+        val scans = history.all.first()
+        assertEquals(1, scans.size)
+        val identification = scans[0].identification
+
+        // Sin confirmar todavía: no hay coincidencia previa.
+        assertTrue(history.findConfirmedMatch(identification) == null)
+
+        history.confirm(scans[0].id)
+        history.saveCorrection(scans[0].id, "nota de prueba, no debería afectar la confirmación")
+
+        val confirmedMatch = history.findConfirmedMatch(identification)
+        assertTrue(confirmedMatch != null)
+        assertEquals(scans[0].id, confirmedMatch!!.id)
     }
 }

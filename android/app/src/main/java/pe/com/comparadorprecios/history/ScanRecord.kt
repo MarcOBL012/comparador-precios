@@ -17,6 +17,10 @@ data class ScanRecord(
     val bestPrice: Double?,
     val thumbnail: ByteArray,
     @ColumnInfo(defaultValue = "") val tipo: String = "",
+    /** La persona confirmó que este resultado sí era el producto que buscaba. */
+    @ColumnInfo(defaultValue = "0") val confirmed: Boolean = false,
+    /** Nombre completo o link que la persona dio cuando el resultado NO era el producto correcto. */
+    val correctionNote: String? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
