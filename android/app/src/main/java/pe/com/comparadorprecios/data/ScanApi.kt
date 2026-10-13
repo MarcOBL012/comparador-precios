@@ -22,6 +22,14 @@ interface ScanApi {
     /** Precios de un producto ya identificado, sin foto (lista de compras, revisar precio en historial). */
     @POST("api/prices")
     suspend fun prices(@Body request: PricesRequest): PricesResponse
+
+    /** Consejos de salud, tecnología o curiosidades del producto (Gemini, texto). */
+    @POST("api/insights")
+    suspend fun insights(@Body request: InsightsRequest): InsightsResponse
+
+    /** Tienda física más cercana de cada cadena VTEX donde se encontró el producto. */
+    @POST("api/nearby-stores")
+    suspend fun nearbyStores(@Body request: NearbyStoresRequest): NearbyStoresResponse
 }
 
 object RetrofitProvider {

@@ -69,6 +69,21 @@ Sin internet la cámara **no se bloquea**: la foto se guarda y se procesa sola a
 | Probar búsqueda real sin IA | `npx tsx scripts/verify-stores.ts` (con `SERPER_API_KEY` en el entorno para Google Shopping) |
 | Pantallas / textos | [android/app/src/main/java/pe/com/comparadorprecios/ui/Screens.kt](android/app/src/main/java/pe/com/comparadorprecios/ui/Screens.kt) |
 | Mensajes de error | [android/app/src/main/java/pe/com/comparadorprecios/data/ScanRepository.kt](android/app/src/main/java/pe/com/comparadorprecios/data/ScanRepository.kt) |
+| Tienda más cercana (cadenas, filtro de marca) | `CHAINS` en [lib/stores/nearbyStores.ts](lib/stores/nearbyStores.ts) **y** `CHAINS_WITH_STORES` en `android/.../util/StoreLocations.kt` |
+| Modo salud / tecnología / curiosidades (prompt) | [lib/productInsights.ts](lib/productInsights.ts); tarjetas en `android/.../ui/ProductExtrasCards.kt` |
+
+## Tienda más cercana y "Descubre más de tu producto"
+
+- `POST /api/nearby-stores` usa el endpoint público de VTEX `/api/checkout/pub/pickup-points`
+  (Plaza Vea, Promart, Oechsle, Wong, Metro). Devuelve la tienda física más cercana de cada
+  cadena, filtrando agentes de terceros (Pickit, Scharff…). **No confirma stock por tienda**:
+  la simulación de VTEX por tienda resultó inconsistente al probarla (2026-10-13), así que la UI
+  dice "disponible online, el stock puede variar por tienda". Falabella y Ripley no son VTEX.
+- La ubicación se pide solo al tocar "Ver tienda más cercana" (o se usa si ya había permiso),
+  con `LocationManagerCompat` — sin Google Play Services. "Cómo llegar" abre Google Maps por URL.
+- `POST /api/insights` genera con Gemini titular, 3 puntos, consejo, dato curioso y (modo salud)
+  un semáforo verde/ámbar/rojo. El modo se guarda en DataStore (`InsightsPreferences`); "auto"
+  lo elige el backend por categoría. Se carga aparte del escaneo: si falla, el precio no se afecta.
 
 ## Deuda técnica conocida, priorizada
 
@@ -86,9 +101,9 @@ Sin internet la cámara **no se bloquea**: la foto se guarda y se procesa sola a
    sin token devolvió 400 (falta imagen), no 401. El código actual en `master` sí exige
    sesión (`api/scan.ts`); falta redesplegar (`vercel deploy --prod`) para que el endpoint
    público deje de aceptar requests sin autenticar.
-5. ~~Ninguna variable de contexto del dispositivo~~ — resuelto para red y batería. Pendiente:
-   ubicación (sucursal cercana) y alertas de bajada de precio en segundo plano (WorkManager +
-   notificaciones + token de Clerk fuera de la app).
+5. ~~Ninguna variable de contexto del dispositivo~~ — resuelto para red, batería y ubicación
+   (tienda más cercana). Pendiente: alertas de bajada de precio en segundo plano (WorkManager +
+   notificaciones + token de Clerk fuera de la app) y stock real por tienda.
 6. **Sin firma de release** — `buildTypes.release` no tiene `signingConfig`; por eso solo
    se puede generar/instalar el APK debug (~30 MB, sin minificar).
 
@@ -113,7 +128,7 @@ Sin internet la cámara **no se bloquea**: la foto se guarda y se procesa sola a
 ## Comandos
 
 ```
-npm test                              # backend (Vitest), 21 archivos de test
+npm test                              # backend (Vitest), 23 archivos de test
 npm run build                         # type-check backend (tsc --noEmit)
 ./gradlew :app:testDebugUnitTest      # tests Android (JVM, sin SDK de emulador)
 ./gradlew :app:assembleDebug          # genera el APK debug
