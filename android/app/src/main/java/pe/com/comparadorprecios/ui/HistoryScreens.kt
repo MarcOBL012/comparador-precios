@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
@@ -269,6 +270,8 @@ fun DetailScreen(
     onCheckPrices: () -> Unit,
     onAddToList: (tiendas: List<StoreResult>) -> Unit,
     onBack: () -> Unit,
+    /** Tarjetas extra (tienda más cercana, datos del producto) debajo de la revisión de precio. */
+    extras: LazyListScope.(tiendas: List<StoreResult>) -> Unit = {},
 ) {
     val currentTiendas = latestCheck?.tiendas ?: item.tiendas
     ResultScreen(
@@ -289,6 +292,7 @@ fun DetailScreen(
                     onCheckPrices = onCheckPrices,
                 )
             }
+            extras(currentTiendas)
         },
     )
 }

@@ -4,7 +4,7 @@ import { ProductIdentificationSchema, type Categoria, type ProductIdentification
 
 // Gemini Flash: rápido, barato y con visión. Lee la key de GOOGLE_GENERATIVE_AI_API_KEY.
 // (Antes: gateway de Vercel 'anthropic/claude-sonnet-5', que exige tarjeta en el proyecto.)
-const MODEL = google('gemini-3.1-flash-lite');
+export const MODEL = google('gemini-3.1-flash-lite');
 
 const IDENTIFICATION_PROMPT = `Eres un asistente que identifica productos de supermercado o retail a partir de una foto de su empaque o etiqueta, para buscar su precio en tiendas peruanas.
 Analiza la imagen con cuidado, incluso si el texto es pequeño o la marca es local/regional y no mundialmente famosa (una marca peruana poco conocida es tan válida como una internacional: transcribe lo que ves, no lo que reconoces). Devuelve:

@@ -12,23 +12,21 @@ import retrofit2.Response
 class ScanRepositoryTest {
 
     private fun apiThatFailsWith(code: Int): ScanApi = object : ScanApi {
-        override suspend fun scan(request: ScanRequest): ScanResponse {
-            throw HttpException(
-                Response.error<ScanResponse>(
-                    code,
-                    "{}".toResponseBody("application/json".toMediaType()),
-                )
+        private fun <T> fail(): Nothing = throw HttpException(
+            Response.error<T>(
+                code,
+                "{}".toResponseBody("application/json".toMediaType()),
             )
-        }
+        )
 
-        override suspend fun prices(request: PricesRequest): PricesResponse {
-            throw HttpException(
-                Response.error<PricesResponse>(
-                    code,
-                    "{}".toResponseBody("application/json".toMediaType()),
-                )
-            )
-        }
+        override suspend fun scan(request: ScanRequest): ScanResponse = fail<ScanResponse>()
+
+        override suspend fun prices(request: PricesRequest): PricesResponse = fail<PricesResponse>()
+
+        override suspend fun insights(request: InsightsRequest): InsightsResponse = fail<InsightsResponse>()
+
+        override suspend fun nearbyStores(request: NearbyStoresRequest): NearbyStoresResponse =
+            fail<NearbyStoresResponse>()
     }
 
     @Test

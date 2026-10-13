@@ -55,6 +55,10 @@ import pe.com.comparadorprecios.ui.OnboardingScreen
 import pe.com.comparadorprecios.ui.PendingScansViewModel
 import pe.com.comparadorprecios.ui.ProductConfirmationCard
 import pe.com.comparadorprecios.ui.ProductConfirmationViewModel
+import pe.com.comparadorprecios.ui.productExtras
+import pe.com.comparadorprecios.data.InsightsPreferences
+import pe.com.comparadorprecios.data.title
+import pe.com.comparadorprecios.location.SystemLocationProvider
 import pe.com.comparadorprecios.ui.ResultScreen
 import pe.com.comparadorprecios.ui.ScanScreen
 import pe.com.comparadorprecios.ui.ScanUiState
@@ -125,6 +129,8 @@ class MainActivity : ComponentActivity() {
                             }
                             val db = remember { AppDatabase.build(context) }
                             val historyRepository = remember { HistoryRepository(db.historyDao()) }
+                            val insightsPreferences = remember { InsightsPreferences(context) }
+                            val locationProvider = remember { SystemLocationProvider(context) }
                             val shoppingListRepository = remember { ShoppingListRepository(db.shoppingDao()) }
                             val pendingRepository = remember {
                                 PendingScanRepository(db.pendingScanDao(), File(context.filesDir, "pending-scans"))
@@ -229,6 +235,16 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                                 extraContent = {
+                                                    // Orden pensado para la decisión: precio (arriba) → dónde
+                                                    // comprarlo hoy → datos que enganchan → confirmar el resultado.
+                                                    productExtras(
+                                                        key = "extras-${s.identification.title}-${s.tiendas.hashCode()}",
+                                                        identification = s.identification,
+                                                        tiendas = s.tiendas,
+                                                        repository = repository,
+                                                        insightsPreferences = insightsPreferences,
+                                                        locationProvider = locationProvider,
+                                                    )
                                                     val scanId = lastSavedScanId
                                                     if (scanId != null) {
                                                         item(key = "confirmation") {
@@ -325,6 +341,16 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                                 onBack = { navController.popBackStack() },
+                                                extras = { tiendas ->
+                                                    productExtras(
+                                                        key = "extras-detail-$scanId",
+                                                        identification = loaded.identification,
+                                                        tiendas = tiendas,
+                                                        repository = repository,
+                                                        insightsPreferences = insightsPreferences,
+                                                        locationProvider = locationProvider,
+                                                    )
+                                                },
                                             )
                                         } else {
                                             LoadingScreen()
