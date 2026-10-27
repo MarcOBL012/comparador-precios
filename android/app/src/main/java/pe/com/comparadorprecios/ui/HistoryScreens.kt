@@ -270,8 +270,12 @@ fun DetailScreen(
     onCheckPrices: () -> Unit,
     onAddToList: (tiendas: List<StoreResult>) -> Unit,
     onBack: () -> Unit,
-    /** Tarjetas extra (tienda más cercana, datos del producto) debajo de la revisión de precio. */
-    extras: LazyListScope.(tiendas: List<StoreResult>) -> Unit = {},
+    /** Al lado del nombre (anillo de puntaje). */
+    headerTrailing: @Composable () -> Unit = {},
+    /** Después del mejor precio (datos del producto). */
+    afterPriceContent: LazyListScope.() -> Unit = {},
+    /** Debajo de la revisión de precio (tienda más cercana y mapa). */
+    extras: LazyListScope.() -> Unit = {},
 ) {
     val currentTiendas = latestCheck?.tiendas ?: item.tiendas
     ResultScreen(
@@ -280,6 +284,8 @@ fun DetailScreen(
         onNewScan = onBack,
         newScanLabel = "Volver al historial",
         onAddToList = { onAddToList(currentTiendas) },
+        headerTrailing = headerTrailing,
+        afterPriceContent = afterPriceContent,
         extraContent = {
             item(key = "price-check") {
                 PriceCheckCard(
@@ -292,7 +298,7 @@ fun DetailScreen(
                     onCheckPrices = onCheckPrices,
                 )
             }
-            extras(currentTiendas)
+            extras()
         },
     )
 }

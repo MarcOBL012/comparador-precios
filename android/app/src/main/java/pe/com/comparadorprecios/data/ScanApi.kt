@@ -30,6 +30,10 @@ interface ScanApi {
     /** Tienda física más cercana de cada cadena VTEX donde se encontró el producto. */
     @POST("api/nearby-stores")
     suspend fun nearbyStores(@Body request: NearbyStoresRequest): NearbyStoresResponse
+
+    /** Ruta a pie o en auto hasta la tienda, para dibujarla en el mapa (OpenStreetMap). */
+    @POST("api/route")
+    suspend fun route(@Body request: RouteRequest): RouteResponse
 }
 
 object RetrofitProvider {

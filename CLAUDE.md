@@ -71,6 +71,8 @@ Sin internet la cámara **no se bloquea**: la foto se guarda y se procesa sola a
 | Mensajes de error | [android/app/src/main/java/pe/com/comparadorprecios/data/ScanRepository.kt](android/app/src/main/java/pe/com/comparadorprecios/data/ScanRepository.kt) |
 | Tienda más cercana (cadenas, filtro de marca) | `CHAINS` en [lib/stores/nearbyStores.ts](lib/stores/nearbyStores.ts) **y** `CHAINS_WITH_STORES` en `android/.../util/StoreLocations.kt` |
 | Modo salud / tecnología / curiosidades (prompt) | [lib/productInsights.ts](lib/productInsights.ts); tarjetas en `android/.../ui/ProductExtrasCards.kt` |
+| Intereses del perfil | `ProfileCatalog` en `android/.../profile/UserProfile.kt` (las etiquetas van tal cual al prompt) |
+| Mapa / ruta a la tienda | [lib/route.ts](lib/route.ts) (servidor de rutas) y `android/.../ui/StoreMap.kt` (osmdroid) |
 
 ## Tienda más cercana y "Descubre más de tu producto"
 
@@ -80,10 +82,19 @@ Sin internet la cámara **no se bloquea**: la foto se guarda y se procesa sola a
   la simulación de VTEX por tienda resultó inconsistente al probarla (2026-10-13), así que la UI
   dice "disponible online, el stock puede variar por tienda". Falabella y Ripley no son VTEX.
 - La ubicación se pide solo al tocar "Ver tienda más cercana" (o se usa si ya había permiso),
-  con `LocationManagerCompat` — sin Google Play Services. "Cómo llegar" abre Google Maps por URL.
-- `POST /api/insights` genera con Gemini titular, 3 puntos, consejo, dato curioso y (modo salud)
-  un semáforo verde/ámbar/rojo. El modo se guarda en DataStore (`InsightsPreferences`); "auto"
-  lo elige el backend por categoría. Se carga aparte del escaneo: si falla, el precio no se afecta.
+  con `LocationManagerCompat` — sin Google Play Services.
+- **Mapa con ruta dentro de la app**: OpenStreetMap vía osmdroid (sin API key). `POST /api/route`
+  pide la ruta al servidor público de FOSSGIS (`routing.openstreetmap.de`): a pie hasta 2.5 km en
+  línea recta, en auto si es más lejos. El demo de OSRM (`router.project-osrm.org`) NO sirve: solo
+  calcula en auto aunque se le pida "foot". Ambos servidores son gratis y sin SLA (bien para la
+  demo, no para tráfico alto). "Iniciar navegación" sigue abriendo Google Maps para el paso a paso.
+- `POST /api/insights` genera con Gemini titular, 3 puntos, consejo, dato curioso, `puntaje` 0-100
+  (anillo estilo Yuka junto al nombre; null en curiosidades) y `paraTi` si llega `perfil`. El modo
+  se guarda en DataStore (`InsightsPreferences`); "auto" lo elige el backend por categoría. Se carga
+  aparte del escaneo: si falla, el precio no se afecta.
+- **Perfil** (`ProfilePreferences`): intereses de un catálogo cerrado, un set por cuenta de Clerk
+  (`interests_<userId>`), solo en el celular — no se sincroniza. El backend recibe solo etiquetas
+  del catálogo, las recorta a 8 y de 40 caracteres, y el prompt las trata como datos, no instrucciones.
 
 ## Deuda técnica conocida, priorizada
 

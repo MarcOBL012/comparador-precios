@@ -111,6 +111,9 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     kapt("androidx.room:room-compiler:2.8.4")
 
+    // Mapa con ruta a la tienda — OpenStreetMap, sin API key ni facturación.
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
+
     // Persistencia local — bandera de onboarding.
     implementation("androidx.datastore:datastore-preferences:1.2.1")
 

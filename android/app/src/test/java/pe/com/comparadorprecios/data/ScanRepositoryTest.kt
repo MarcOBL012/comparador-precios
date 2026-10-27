@@ -27,6 +27,8 @@ class ScanRepositoryTest {
 
         override suspend fun nearbyStores(request: NearbyStoresRequest): NearbyStoresResponse =
             fail<NearbyStoresResponse>()
+
+        override suspend fun route(request: RouteRequest): RouteResponse = fail<RouteResponse>()
     }
 
     @Test
