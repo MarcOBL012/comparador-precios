@@ -55,7 +55,14 @@ import pe.com.comparadorprecios.ui.OnboardingScreen
 import pe.com.comparadorprecios.ui.PendingScansViewModel
 import pe.com.comparadorprecios.ui.ProductConfirmationCard
 import pe.com.comparadorprecios.ui.ProductConfirmationViewModel
-import pe.com.comparadorprecios.ui.productExtras
+import pe.com.comparadorprecios.ui.NearbyStoreCard
+import pe.com.comparadorprecios.ui.ProductExtrasDeps
+import pe.com.comparadorprecios.ui.ProductInsightsCard
+import pe.com.comparadorprecios.ui.ProductScoreBadge
+import pe.com.comparadorprecios.ui.ProfileScreen
+import pe.com.comparadorprecios.ui.ProfileViewModel
+import pe.com.comparadorprecios.ui.rememberProductExtras
+import pe.com.comparadorprecios.profile.ProfilePreferences
 import pe.com.comparadorprecios.data.InsightsPreferences
 import pe.com.comparadorprecios.data.title
 import pe.com.comparadorprecios.location.SystemLocationProvider
@@ -131,6 +138,11 @@ class MainActivity : ComponentActivity() {
                             val historyRepository = remember { HistoryRepository(db.historyDao()) }
                             val insightsPreferences = remember { InsightsPreferences(context) }
                             val locationProvider = remember { SystemLocationProvider(context) }
+                            val profileStore = remember { ProfilePreferences(context) }
+                            val userId = user?.id
+                            val extrasDeps = remember(userId) {
+                                ProductExtrasDeps(repository, insightsPreferences, locationProvider, profileStore, userId)
+                            }
                             val shoppingListRepository = remember { ShoppingListRepository(db.shoppingDao()) }
                             val pendingRepository = remember {
                                 PendingScanRepository(db.pendingScanDao(), File(context.filesDir, "pending-scans"))
@@ -148,6 +160,11 @@ class MainActivity : ComponentActivity() {
                             var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
                             val navController = rememberNavController()
                             val snackbar = remember { SnackbarHostState() }
+                            val openProfile: (() -> Unit)? = if (userId != null) {
+                                { navController.navigate(AppRoutes.PROFILE) { launchSingleTop = true } }
+                            } else {
+                                null
+                            }
 
                             // Vuelve la conexión (o se abre la app con pendientes de una sesión
                             // anterior) → se procesa la cola sola, sin que el usuario haga nada.
@@ -223,7 +240,14 @@ class MainActivity : ComponentActivity() {
                                                 onRetake = { vm.reset() },
                                                 onSearchWeb = { base, q -> openWebSearch(context, base, q) },
                                             )
-                                            is ScanUiState.Success -> ResultScreen(
+                                            is ScanUiState.Success -> {
+                                              val extras = rememberProductExtras(
+                                                key = "extras-${s.identification.title}-${s.tiendas.hashCode()}",
+                                                identification = s.identification,
+                                                tiendas = s.tiendas,
+                                                deps = extrasDeps,
+                                              )
+                                              ResultScreen(
                                                 identification = s.identification,
                                                 tiendas = s.tiendas,
                                                 onNewScan = { vm.reset() },
@@ -234,17 +258,16 @@ class MainActivity : ComponentActivity() {
                                                         snackbar.showSnackbar("Producto agregado a tu lista de compras")
                                                     }
                                                 },
+                                                // Orden pensado para la decisión: puntaje junto al nombre →
+                                                // precio → datos para ti → tiendas → mapa → confirmar.
+                                                headerTrailing = { ProductScoreBadge(extras) },
+                                                afterPriceContent = {
+                                                    item(key = "insights") { ProductInsightsCard(extras, openProfile) }
+                                                },
                                                 extraContent = {
-                                                    // Orden pensado para la decisión: precio (arriba) → dónde
-                                                    // comprarlo hoy → datos que enganchan → confirmar el resultado.
-                                                    productExtras(
-                                                        key = "extras-${s.identification.title}-${s.tiendas.hashCode()}",
-                                                        identification = s.identification,
-                                                        tiendas = s.tiendas,
-                                                        repository = repository,
-                                                        insightsPreferences = insightsPreferences,
-                                                        locationProvider = locationProvider,
-                                                    )
+                                                    if (extras.hasChainsToLocate) {
+                                                        item(key = "nearby") { NearbyStoreCard(extras) }
+                                                    }
                                                     val scanId = lastSavedScanId
                                                     if (scanId != null) {
                                                         item(key = "confirmation") {
@@ -261,7 +284,8 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     }
                                                 },
-                                            )
+                                              )
+                                            }
                                             is ScanUiState.Error -> ErrorScreen(
                                                 message = s.message,
                                                 onRetry = { vm.reset() },
@@ -327,6 +351,12 @@ class MainActivity : ComponentActivity() {
                                         val checkError by detailVm.checkError.collectAsState()
                                         val loaded = item
                                         if (loaded != null) {
+                                            val extras = rememberProductExtras(
+                                                key = "extras-detail-$scanId",
+                                                identification = loaded.identification,
+                                                tiendas = latestCheck?.tiendas ?: loaded.tiendas,
+                                                deps = extrasDeps,
+                                            )
                                             DetailScreen(
                                                 item = loaded,
                                                 latestCheck = latestCheck,
@@ -341,19 +371,33 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                                 onBack = { navController.popBackStack() },
-                                                extras = { tiendas ->
-                                                    productExtras(
-                                                        key = "extras-detail-$scanId",
-                                                        identification = loaded.identification,
-                                                        tiendas = tiendas,
-                                                        repository = repository,
-                                                        insightsPreferences = insightsPreferences,
-                                                        locationProvider = locationProvider,
-                                                    )
+                                                headerTrailing = { ProductScoreBadge(extras) },
+                                                afterPriceContent = {
+                                                    item(key = "insights") { ProductInsightsCard(extras, openProfile) }
+                                                },
+                                                extras = {
+                                                    if (extras.hasChainsToLocate) {
+                                                        item(key = "nearby") { NearbyStoreCard(extras) }
+                                                    }
                                                 },
                                             )
                                         } else {
                                             LoadingScreen()
+                                        }
+                                    }
+                                    composable(AppRoutes.PROFILE) {
+                                        val id = userId
+                                        if (id == null) {
+                                            LaunchedEffect(Unit) { navController.popBackStack() }
+                                        } else {
+                                            val profileVm: ProfileViewModel = viewModel(key = "profile-$id") {
+                                                ProfileViewModel(id, profileStore, insightsPreferences)
+                                            }
+                                            ProfileScreen(
+                                                viewModel = profileVm,
+                                                displayName = user?.firstName,
+                                                onBack = { navController.popBackStack() },
+                                            )
                                         }
                                     }
                                 }

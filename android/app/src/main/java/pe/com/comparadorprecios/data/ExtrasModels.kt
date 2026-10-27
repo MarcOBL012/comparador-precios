@@ -14,6 +14,8 @@ object InsightsMode {
 data class InsightsRequest(
     val identification: Identification,
     val modo: String = InsightsMode.AUTO,
+    /** Intereses del perfil ("Bajar azúcar", "Gaming"…) para personalizar los consejos. */
+    val perfil: List<String> = emptyList(),
 )
 
 @Serializable
@@ -28,6 +30,10 @@ data class ProductInsights(
     /** "verde" | "ambar" | "rojo" (modo salud) o "neutro". */
     val semaforo: String = "neutro",
     val etiquetaSemaforo: String = "",
+    /** 0-100 para el anillo de puntaje; null en curiosidades. */
+    val puntaje: Double? = null,
+    /** Frase dirigida al perfil de la persona; vacía si no configuró perfil. */
+    val paraTi: String = "",
     val puntos: List<InsightPoint> = emptyList(),
     val consejo: String = "",
     val datoCurioso: String = "",
@@ -60,4 +66,31 @@ data class NearbyStore(
 @Serializable
 data class NearbyStoresResponse(
     val tiendas: List<NearbyStore> = emptyList(),
+)
+
+@Serializable
+data class GeoPoint(val lat: Double, val lng: Double)
+
+@Serializable
+data class RouteRequest(
+    val origen: GeoPoint,
+    val destino: GeoPoint,
+)
+
+@Serializable
+data class StoreRoute(
+    /** "pie" | "auto": el backend decide según la distancia. */
+    val modo: String,
+    val distanciaKm: Double,
+    val minutos: Int,
+    /** Puntos [lat, lng] en orden, para dibujar la línea en el mapa. */
+    val puntos: List<List<Double>> = emptyList(),
+) {
+    val walking: Boolean get() = modo == "pie"
+}
+
+@Serializable
+data class RouteResponse(
+    /** null = no se encontró camino; el mapa muestra igual las dos posiciones. */
+    val ruta: StoreRoute? = null,
 )

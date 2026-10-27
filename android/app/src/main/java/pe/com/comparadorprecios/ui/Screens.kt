@@ -213,6 +213,10 @@ fun ResultScreen(
     newScanLabel: String = "Escanear otro producto",
     webSearchSkipped: Boolean = false,
     onAddToList: (() -> Unit)? = null,
+    /** Al lado del nombre del producto (ej. el anillo de puntaje). */
+    headerTrailing: @Composable () -> Unit = {},
+    /** Justo después del mejor precio, antes de la lista de tiendas. */
+    afterPriceContent: LazyListScope.() -> Unit = {},
     extraContent: LazyListScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -223,7 +227,13 @@ fun ResultScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "header") { ProductHeader(identification) }
+            item(key = "header") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { ProductHeader(identification) }
+                    Spacer(Modifier.width(12.dp))
+                    headerTrailing()
+                }
+            }
             if (webSearchSkipped) {
                 item(key = "battery-notice") {
                     ContextNotices(listOf("Batería baja: no se buscó en otras tiendas de internet. Carga el celular para ver más opciones."))
@@ -234,6 +244,7 @@ fun ResultScreen(
             } else {
                 item(key = "no-offers") { NoOffersCard(hasStores = tiendas.isNotEmpty()) }
             }
+            afterPriceContent()
             itemsIndexed(tiendas, key = { index, tienda -> "$index-${tienda.tienda}" }) { _, tienda ->
                 StoreRow(
                     result = tienda,

@@ -29,10 +29,15 @@ class ScanRepository(private val api: ScanApi) {
             validationMessage = { "No se pudo buscar este producto: faltan datos para identificarlo." },
         ) { api.prices(PricesRequest(identification, contexto)) }
 
-    suspend fun insights(identification: Identification, modo: String): InsightsResponse =
+    suspend fun insights(identification: Identification, modo: String, perfil: List<String> = emptyList()): InsightsResponse =
         mapErrors(
             validationMessage = { "Este producto no tiene datos suficientes para generar consejos." },
-        ) { api.insights(InsightsRequest(identification, modo)) }
+        ) { api.insights(InsightsRequest(identification, modo, perfil)) }
+
+    suspend fun route(origen: GeoPoint, destino: GeoPoint): RouteResponse =
+        mapErrors(
+            validationMessage = { "No se pudo calcular la ruta con esas ubicaciones." },
+        ) { api.route(RouteRequest(origen, destino)) }
 
     suspend fun nearbyStores(cadenas: List<String>, lat: Double, lng: Double): NearbyStoresResponse =
         mapErrors(
