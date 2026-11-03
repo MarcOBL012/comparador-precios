@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
@@ -28,6 +29,7 @@ object AppRoutes {
     const val SCAN = "scan"
     const val HISTORY = "history"
     const val SHOPPING = "shopping"
+    const val WATCHES = "watches"
     const val DETAIL_ARG = "scanId"
     const val DETAIL = "detail/{$DETAIL_ARG}"
     const val PROFILE = "profile"
@@ -42,6 +44,7 @@ private data class BottomDestination(val route: String, val label: String, val i
 private val BOTTOM_DESTINATIONS = listOf(
     BottomDestination(AppRoutes.SCAN, "Escanear", Icons.Filled.PhotoCamera),
     BottomDestination(AppRoutes.HISTORY, "Historial", Icons.Filled.History),
+    BottomDestination(AppRoutes.WATCHES, "Seguimiento", Icons.Filled.NotificationsActive),
     BottomDestination(AppRoutes.SHOPPING, "Lista", Icons.Filled.ShoppingCart),
 )
 

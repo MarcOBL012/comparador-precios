@@ -33,6 +33,11 @@ import pe.com.comparadorprecios.context.ContextPolicy
 import pe.com.comparadorprecios.context.DeviceContextMonitor
 import pe.com.comparadorprecios.data.OnboardingPreferences
 import pe.com.comparadorprecios.data.RetrofitProvider
+import pe.com.comparadorprecios.data.WatchRepository
+import pe.com.comparadorprecios.ui.FollowPriceCard
+import pe.com.comparadorprecios.ui.WatchesScreen
+import pe.com.comparadorprecios.ui.WatchesViewModel
+import pe.com.comparadorprecios.util.PriceInsights
 import pe.com.comparadorprecios.data.ScanRepository
 import pe.com.comparadorprecios.history.AppDatabase
 import pe.com.comparadorprecios.history.HistoryRepository
@@ -126,6 +131,14 @@ class MainActivity : ComponentActivity() {
                             val deviceContext by deviceContextFlow.collectAsStateWithLifecycle(initialValue = contextMonitor.current())
                             val policy = remember(deviceContext) { ContextPolicy.decide(deviceContext) }
 
+                            val watchRepository = remember {
+                                WatchRepository(
+                                    RetrofitProvider.createWatchApi(
+                                        baseUrl = BuildConfig.SCAN_BASE_URL,
+                                        debug = BuildConfig.DEBUG,
+                                    )
+                                )
+                            }
                             val repository = remember {
                                 ScanRepository(
                                     RetrofitProvider.create(
@@ -152,6 +165,8 @@ class MainActivity : ComponentActivity() {
                             }
 
                             val vm: ScanViewModel = viewModel { ScanViewModel(repository) }
+                            // Un ViewModel por cuenta: al cambiar de sesión no se ven los seguimientos de otra persona.
+                            val watchesVm: WatchesViewModel = viewModel(key = "watches-$userId") { WatchesViewModel(watchRepository) }
                             val pendingVm: PendingScansViewModel =
                                 viewModel { PendingScansViewModel(pendingRepository, pendingProcessor) }
                             val pendingScans by pendingVm.pending.collectAsState()
@@ -265,6 +280,13 @@ class MainActivity : ComponentActivity() {
                                                     item(key = "insights") { ProductInsightsCard(extras, openProfile) }
                                                 },
                                                 extraContent = {
+                                                    item(key = "follow") {
+                                                        FollowPriceCard(
+                                                            identification = s.identification,
+                                                            bestPrice = PriceInsights.summarize(s.tiendas)?.bestPrice,
+                                                            viewModel = watchesVm,
+                                                        )
+                                                    }
                                                     if (extras.hasChainsToLocate) {
                                                         item(key = "nearby") { NearbyStoreCard(extras) }
                                                     }
@@ -322,6 +344,18 @@ class MainActivity : ComponentActivity() {
                                                 pendingVm.processPending(policy.saveBattery, announceEmpty = true)
                                             },
                                             onDiscardPending = { pendingVm.discard(it) },
+                                        )
+                                    }
+                                    composable(AppRoutes.WATCHES) {
+                                        WatchesScreen(
+                                            viewModel = watchesVm,
+                                            snackbar = snackbar,
+                                            onScan = {
+                                                navController.navigate(AppRoutes.SCAN) {
+                                                    popUpTo(AppRoutes.SCAN) { inclusive = false }
+                                                    launchSingleTop = true
+                                                }
+                                            },
                                         )
                                     }
                                     composable(AppRoutes.SHOPPING) {
