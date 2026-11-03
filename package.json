@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:up": "docker compose up -d --wait db"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.64",
     "@clerk/backend": "^3.17.1",
     "ai": "^7.0.0",
+    "postgres": "^4.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

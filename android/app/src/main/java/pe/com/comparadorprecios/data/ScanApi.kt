@@ -42,7 +42,14 @@ object RetrofitProvider {
         explicitNulls = false
     }
 
-    fun create(baseUrl: String, debug: Boolean = false): ScanApi {
+    fun create(baseUrl: String, debug: Boolean = false): ScanApi =
+        retrofit(baseUrl, debug).create(ScanApi::class.java)
+
+    /** Mismo cliente HTTP (token de Clerk, timeouts) para la API REST propia de seguimientos. */
+    fun createWatchApi(baseUrl: String, debug: Boolean = false): WatchApi =
+        retrofit(baseUrl, debug).create(WatchApi::class.java)
+
+    private fun retrofit(baseUrl: String, debug: Boolean): Retrofit {
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         val logging = HttpLoggingInterceptor().apply {
             level = if (debug) HttpLoggingInterceptor.Level.BASIC
@@ -109,6 +116,5 @@ object RetrofitProvider {
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-            .create(ScanApi::class.java)
     }
 }
