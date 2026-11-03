@@ -1,0 +1,350 @@
+openapi: 3.0.3
+info:
+  title: API de seguimiento de precios
+  version: 1.0.0
+  description: |
+    API REST propia del Comparador de Precios (Taller 3). Una persona sigue un producto con un precio
+    objetivo; el servidor guarda el historial de precios, aplica reglas de negocio y genera alertas.
+
+    **Autenticación:** `Authorization: Bearer <token de Clerk>`. Para probar sin Clerk, con
+    `AUTH_DEV_MODE=1` en un servidor local se acepta `X-Dev-User: <nombre>` (nunca funciona en Vercel).
+    `/internal/check-due` usa `Authorization: Bearer <CRON_SECRET>`.
+
+    **Errores:** todos tienen la forma `{ "error": "texto para la persona", "codigo": "codigo_estable", "detalles": [...] }`.
+    Un recurso de otra persona responde 404 (no 403) para no revelar que existe.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: vercel dev / servidor local
+  - url: https://comparador-precios-marco-obl.vercel.app/api/v1
+    description: Producción
+security:
+  - bearer: []
+tags:
+  - name: Seguimientos
+  - name: Precios
+  - name: Alertas
+  - name: Interno
+paths:
+  /watches:
+    post:
+      tags: [Seguimientos]
+      summary: Seguir un producto
+      description: |
+        Reglas: R1 un seguimiento por producto y persona (409 `ya_seguido`); R2 máximo 20 seguimientos
+        activos (409 `limite_seguimientos`). El producto se normaliza: dos personas que siguen el mismo
+        producto comparten una sola fila.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWatch' }
+            example:
+              producto: { marca: Free Tea, nombre: Frutos Rojos, presentacion: 500ml, categoria: bebidas, tipo: té }
+              precioObjetivo: 2.5
+      responses:
+        '201':
+          description: Creado. El encabezado `Location` apunta al recurso.
+          headers:
+            Location: { schema: { type: string }, example: /api/v1/watches/6f1c5f0e-0c3a-4b7e-9d1e-2f6a7c9b1a10 }
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Watch' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [Seguimientos]
+      summary: Listar mis seguimientos
+      parameters:
+        - { name: estado, in: query, schema: { type: string, enum: [activa, pausada, alcanzada] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Página de seguimientos con el mejor precio actual y el mínimo histórico.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/WatchPage' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /watches/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Seguimientos]
+      summary: Detalle de un seguimiento
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Watch' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Seguimientos]
+      summary: Cambiar el objetivo o pausar/reactivar
+      description: |
+        R7 transiciones válidas: activa↔pausada; alcanzada→activa|pausada. Reactivar uno `alcanzada`
+        exige un objetivo menor al precio actual (422), si no se volvería a disparar al instante.
+        `precioObjetivo: null` quita el objetivo (solo se avisan mínimos históricos).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWatch' }
+            example: { estado: pausada }
+      responses:
+        '200':
+          description: Seguimiento actualizado.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Watch' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+    delete:
+      tags: [Seguimientos]
+      summary: Dejar de seguir
+      description: Borra el seguimiento y, en cascada, sus alertas. El historial de precios del producto se conserva.
+      responses:
+        '204': { description: Eliminado, sin cuerpo. }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /watches/{id}/check:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Precios]
+      summary: Revisar el precio ahora (lógica de negocio)
+      description: |
+        Consulta las tiendas, guarda los precios y evalúa las reglas en UNA transacción.
+        R3 una revisión cada 15 min por seguimiento (429 con `Retry-After`);
+        R4 `objetivo_alcanzado` (mejor precio ≤ objetivo, pasa a `alcanzada`);
+        R5 `minimo_historico` (menor al mínimo anterior, con ≥ 3 observaciones previas);
+        R6 se descartan precios atípicos (< 40 % de la mediana histórica).
+      responses:
+        '200':
+          description: Resultado de la revisión.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/CheckResult' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429':
+          description: Demasiadas revisiones.
+          headers:
+            Retry-After: { schema: { type: integer }, description: Segundos hasta poder revisar de nuevo. }
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+        '502':
+          description: Las tiendas no respondieron; no se guardó nada.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Error' } }
+  /watches/{id}/history:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Precios]
+      summary: Historial de precios con estadísticas y tendencia
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 365, default: 30 } }
+      responses:
+        '200':
+          description: Serie de precios y resumen.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/History' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /alerts:
+    get:
+      tags: [Alertas]
+      summary: Bandeja de alertas
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean, default: false } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Alertas, de la más reciente a la más antigua.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/AlertPage' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /alerts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Alertas]
+      summary: Marcar una alerta como leída o no leída
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leida]
+              properties: { leida: { type: boolean } }
+              additionalProperties: false
+      responses:
+        '200':
+          description: Alerta actualizada.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Alert' } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /internal/check-due:
+    get:
+      tags: [Interno]
+      summary: Revisión automática (la dispara el cron de Vercel)
+      description: Revisa un lote de seguimientos activos sin revisar hace más de 6 h. Un fallo no detiene a los demás. Acepta también POST.
+      security:
+        - cron: []
+      responses:
+        '200':
+          description: Resumen de la corrida.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revisados: { type: integer }
+                  alertas: { type: integer }
+                  errores: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, description: Token de sesión de Clerk }
+    cron: { type: http, scheme: bearer, description: CRON_SECRET }
+  responses:
+    Validation:
+      description: 400 — petición mal formada (el detalle indica el campo).
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: 401 — falta la sesión o es inválida.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: 404 — no existe o es de otra persona.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: 409 — choca con el estado actual. `codigo` es ya_seguido, limite_seguimientos, seguimiento_pausado o transicion_invalida.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    BusinessRule:
+      description: 422 — rompe una regla de negocio.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Error:
+      type: object
+      required: [error, codigo]
+      properties:
+        error: { type: string }
+        codigo: { type: string }
+        detalles:
+          type: array
+          items:
+            type: object
+            properties: { campo: { type: string }, mensaje: { type: string } }
+    Product:
+      type: object
+      required: [nombre, categoria]
+      properties:
+        marca: { type: string, maxLength: 80 }
+        nombre: { type: string, minLength: 1, maxLength: 200 }
+        presentacion: { type: string, maxLength: 60 }
+        categoria:
+          type: string
+          enum: [abarrotes, bebidas, limpieza, cuidado_personal, tecnologia, electrohogar, hogar, ferreteria, moda, juguetes, otros]
+        tipo: { type: string, maxLength: 60 }
+    CreateWatch:
+      type: object
+      required: [producto]
+      additionalProperties: false
+      properties:
+        producto: { $ref: '#/components/schemas/Product' }
+        precioObjetivo: { type: number, minimum: 0.01, maximum: 1000000, multipleOf: 0.01, nullable: true }
+    UpdateWatch:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        precioObjetivo: { type: number, minimum: 0.01, multipleOf: 0.01, nullable: true }
+        estado: { type: string, enum: [activa, pausada] }
+    PriceSummary:
+      type: object
+      properties:
+        mejorPrecio: { type: number, nullable: true }
+        tienda: { type: string, nullable: true }
+        minimoHistorico: { type: number, nullable: true }
+        observaciones: { type: integer }
+    Watch:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        producto:
+          allOf:
+            - { $ref: '#/components/schemas/Product' }
+            - { type: object, properties: { id: { type: string, format: uuid } } }
+        precioObjetivo: { type: number, nullable: true }
+        estado: { type: string, enum: [activa, pausada, alcanzada] }
+        ultimaRevision: { type: string, format: date-time, nullable: true }
+        creadoEn: { type: string, format: date-time }
+        actualizadoEn: { type: string, format: date-time }
+        resumenPrecios: { $ref: '#/components/schemas/PriceSummary' }
+    WatchPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Watch' } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    Alert:
+      type: object
+      properties:
+        id: { type: integer }
+        tipo:
+          type: object
+          properties: { codigo: { type: string, enum: [objetivo_alcanzado, minimo_historico] }, nombre: { type: string } }
+        mensaje: { type: string, description: Se deriva del tipo y la observación; no se guarda. }
+        seguimientoId: { type: string, format: uuid }
+        producto: { type: string }
+        tienda: { type: string }
+        precio: { type: number }
+        creadaEn: { type: string, format: date-time }
+        leida: { type: boolean }
+    AlertPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Alert' } }
+        total: { type: integer }
+        sinLeer: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    CheckResult:
+      type: object
+      properties:
+        seguimiento: { $ref: '#/components/schemas/Watch' }
+        ofertasGuardadas: { type: integer }
+        ofertasDescartadas: { type: integer }
+        alertasNuevas: { type: array, items: { $ref: '#/components/schemas/Alert' } }
+    History:
+      type: object
+      properties:
+        dias: { type: integer }
+        puntos:
+          type: array
+          items:
+            type: object
+            properties:
+              observadoEn: { type: string, format: date-time }
+              tienda: { type: string }
+              precio: { type: number }
+        estadisticas:
+          type: object
+          properties:
+            minimo: { type: number, nullable: true }
+            maximo: { type: number, nullable: true }
+            promedio: { type: number, nullable: true }
+            cantidad: { type: integer }
+            tendencia: { type: string, enum: [baja, sube, estable, sin_datos] }

@@ -1,0 +1,20 @@
+# Postgres local para desarrollo y pruebas de integración (no hace falta cuenta de Supabase).
+#   docker compose up -d db
+#   npm run db:migrate
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: comparador
+    ports:
+      - "54329:5432"
+    volumes:
+      # Crea los roles y esquemas que Supabase ya trae, para que las mismas migraciones corran aquí.
+      - ./db/local-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d comparador"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

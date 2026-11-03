@@ -1,0 +1,1174 @@
+{
+  "info": {
+    "name": "API de seguimiento de precios (Taller 3)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Ejecuta la carpeta completa con el Runner de Postman: cubre éxitos y fallos de los 10 endpoints. Requiere el servidor con AUTH_DEV_MODE=1 (local) o un token de Clerk."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "devUser",
+      "value": "postman"
+    },
+    {
+      "key": "cronSecret",
+      "value": "cambia-esto"
+    },
+    {
+      "key": "watchId",
+      "value": ""
+    },
+    {
+      "key": "alertId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Seguimientos (CRUD)",
+      "item": [
+        {
+          "name": "Crear seguimiento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Guarda el id\", function () {",
+                  "  pm.collectionVariables.set(\"watchId\", pm.response.json().id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Trae Location\", function () {",
+                  "  pm.expect(pm.response.headers.get(\"Location\")).to.include(\"/api/v1/watches/\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"producto\": {\n    \"marca\": \"Free Tea\",\n    \"nombre\": \"Frutos Rojos\",\n    \"presentacion\": \"500ml\",\n    \"categoria\": \"bebidas\",\n    \"tipo\": \"té\"\n  },\n  \"precioObjetivo\": 2.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear repetido → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"codigo ya_seguido\", function () {",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"ya_seguido\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"producto\": {\n    \"marca\": \"Free Tea\",\n    \"nombre\": \"Frutos Rojos\",\n    \"presentacion\": \"500ml\",\n    \"categoria\": \"bebidas\",\n    \"tipo\": \"té\"\n  },\n  \"precioObjetivo\": 2.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear con datos inválidos → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Detalla los campos\", function () {",
+                  "  pm.expect(pm.response.json().detalles.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"producto\": {\n    \"nombre\": \"\",\n    \"categoria\": \"inventada\"\n  },\n  \"precioObjetivo\": -3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Listar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches?limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar con parámetro inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches?limit=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "500"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle de id inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle con id mal formado → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/no-es-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "no-es-uuid"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cambiar objetivo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precioObjetivo\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Pausar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"pausada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Estado que el usuario no puede pedir → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"alcanzada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Revisar un seguimiento pausado → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}/check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}",
+                "check"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reactivar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"activa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sin sesión → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Quita el encabezado X-Dev-User de esta petición.",
+            "url": {
+              "raw": "{{baseUrl}}/watches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Método no permitido → 405",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 405\", function () {",
+                  "  pm.response.to.have.status(405);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Precios y alertas (lógica de negocio)",
+      "item": [
+        {
+          "name": "Revisar ahora",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 (ofertas) o 502 (tiendas caídas)\", function () {",
+                  "  pm.expect([200, 502]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "description": "Consulta las tiendas reales: 502 si no responden.",
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}/check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}",
+                "check"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Revisar otra vez enseguida → 429",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"429 con Retry-After (o 502)\", function () {",
+                  "  if (pm.response.code === 429) { pm.expect(pm.response.headers.get(\"Retry-After\")).to.be.ok; } else { pm.expect(pm.response.code).to.eql(502); }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}/check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}",
+                "check"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Historial",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Trae estadísticas\", function () {",
+                  "  pm.expect(pm.response.json().estadisticas).to.have.property(\"tendencia\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}/history?days=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Historial con days inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}/history?days=9999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "9999"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar alertas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Guarda la primera alerta si hay\", function () {",
+                  "  const items = pm.response.json().items; if (items.length) pm.collectionVariables.set(\"alertId\", items[0].id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts?unread=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "unread",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Marcar alerta como leída",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 si hay alerta, 404 si no\", function () {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/{{alertId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "{{alertId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leida\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Marcar alerta con cuerpo inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leida\": \"si\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Limpieza y cron",
+      "item": [
+        {
+          "name": "Cron sin secreto → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/check-due",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "check-due"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cron con secreto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Resume la corrida\", function () {",
+                  "  pm.expect(pm.response.json()).to.have.property(\"revisados\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cronSecret}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/check-due",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "check-due"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Eliminar seguimiento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Eliminar otra vez → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Dev-User",
+                "value": "{{devUser}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/watches/{{watchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "watches",
+                "{{watchId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
