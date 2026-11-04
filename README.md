@@ -90,6 +90,92 @@ Luego, desde `android/`:
 
 O ábrelo directamente en Android Studio (`android/` como raíz del proyecto) y ejecuta la app en un emulador o dispositivo físico con el botón Run.
 
+## 3. API REST de seguimiento de precios (Taller 3)
+
+API propia, versionada en `/api/v1`, con base de datos Postgres (Supabase en producción, Docker en local). El usuario sigue un producto, el sistema revisa sus precios en las tiendas y genera alertas cuando baja.
+
+### Arquitectura
+
+```
+Android (Retrofit)  →  api/v1/dispatch.ts  →  Router  →  Controller  →  Service  →  Repository  →  Postgres
+                                                  │            │            │             │
+                                                  │            │            │             └─ solo SQL (lib/*/repository.ts)
+                                                  │            │            └─ reglas de negocio (lib/*/service.ts, lib/prices/alertRules.ts)
+                                                  │            └─ validación con Zod + códigos HTTP (lib/*/controller.ts)
+                                                  └─ autenticación: Clerk (usuario) o CRON_SECRET (tareas internas)
+```
+
+| Carpeta | Contenido |
+|---|---|
+| `api/v1/` | Punto de entrada serverless (un solo catch-all) |
+| `lib/http/` | Router, respuestas y mapeo de errores de dominio a códigos HTTP |
+| `lib/watches/` | Seguimientos: CRUD |
+| `lib/prices/` | Revisión de precios, historial, alertas y reglas |
+| `lib/db/` | Conexión a Postgres |
+| `db/migrations/` | Esquema SQL normalizado (001–005) |
+| `docs/api/` | `openapi.yaml` y colección de Postman |
+| `test/watches`, `test/prices`, `test/integration` | Tests unitarios, de API y de integración contra Postgres real |
+
+### Endpoints
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/watches` | Seguir un producto (con precio objetivo opcional) |
+| GET | `/watches` | Listar seguimientos (filtro `estado`, paginación) |
+| GET | `/watches/{id}` | Detalle |
+| PATCH | `/watches/{id}` | Cambiar objetivo o estado (pausar/reactivar) |
+| DELETE | `/watches/{id}` | Dejar de seguir (borra sus alertas) |
+| POST | `/watches/{id}/check` | Revisar precios ahora (operación de negocio) |
+| GET | `/watches/{id}/history` | Historial de precios y estadísticas |
+| GET | `/alerts` | Alertas del usuario |
+| PATCH | `/alerts/{id}` | Marcar alerta como leída o no leída |
+| GET/POST | `/internal/check-due` | Revisión automática (cron diario, requiere `CRON_SECRET`) |
+
+Códigos: 200, 201, 204, 400 (validación), 401, 404, 405, 409 (ya seguido, límite de seguimientos, estado inválido), 422 (regla de negocio), 429 (con `Retry-After`), 502 (tiendas caídas), 503, 500. Detalle de cada ruta, cuerpos JSON y ejemplos en [`docs/api/openapi.yaml`](docs/api/openapi.yaml).
+
+### Reglas de negocio
+
+1. Un seguimiento por usuario y producto (409 `ya_seguido`).
+2. Máximo 20 seguimientos activos por usuario (409 `limite_seguimientos`).
+3. Una revisión cada 15 minutos por seguimiento (429).
+4. Si el mejor precio es menor o igual al objetivo: alerta `objetivo_alcanzado` y el seguimiento pasa a `alcanzada`.
+5. Alerta `minimo_historico` si supera el mínimo de al menos 3 observaciones previas.
+6. Se descartan precios atípicos (menos del 40 % de la mediana).
+7. Transiciones de estado válidas: `activa ↔ pausada`; `alcanzada → activa | pausada` (reactivar exige un objetivo menor).
+
+### Base de datos
+
+Esquema normalizado (3FN): `categories`, `brands`, `product_types`, `products`, `stores`, `store_listings`, `price_observations`, `app_users`, `devices`, `watches`, `watch_statuses` y `watch_status_transitions`, `alerts`, `alert_types`, `push_deliveries`, `identification_signatures`, `signature_confirmations` y la tabla de eventos `domain_events` (outbox). Las claves foráneas, los `unique` y los triggers garantizan la integridad aunque se escriba por fuera de la API.
+
+### Correr todo en local
+
+Requiere Docker.
+
+```bash
+npm install
+npm run db:up                                                                    # Postgres en localhost:54329
+DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador npm run db:migrate
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador npm test   # unitarios + integración
+```
+
+Para levantar la API en local (`vercel dev`, puerto 3000) define en `.env.local`:
+
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador
+AUTH_DEV_MODE=1        # permite el encabezado X-Dev-User en lugar de un token de Clerk
+CRON_SECRET=cualquier-texto
+```
+
+`AUTH_DEV_MODE` se ignora cuando corre en Vercel.
+
+### Probar con Postman
+
+Importa `docs/api/postman_collection.json` y ejecuta la colección completa con el Runner (cubre éxitos y fallos de los 10 endpoints). Variables: `baseUrl` (`http://localhost:3000/api/v1` o la URL de Vercel), `devUser` y `cronSecret`.
+
+### En producción (Vercel + Supabase)
+
+Variables de entorno en Vercel (Production y Preview): `DATABASE_URL` (cadena del *Transaction pooler* de Supabase) y `CRON_SECRET`, además de las del backend original. `vercel.json` programa la revisión diaria de seguimientos (`/api/v1/internal/check-due`).
+
 ## Dependencias principales
 
 **Backend:** TypeScript, Vercel Functions, [Vercel AI SDK](https://sdk.vercel.ai/) (`ai`, `@ai-sdk/google`) para la identificación con Gemini, `@clerk/backend` para verificar la sesión, Zod, Vitest para tests.
