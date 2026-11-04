@@ -77,7 +77,7 @@ def architecture():
     d = Drawing(17.4 * cm, 3.5 * cm)
     y = 38
     xs = [(0, 'App Android', 'Compose + Retrofit\nViewModel + errores tipados'),
-          (92, 'api/v1/[...route]', 'Vercel serverless\nRouter + autenticación'),
+          (92, 'api/v1/dispatch', 'Vercel serverless\nRouter + autenticación'),
           (184, 'Controller', 'Zod: valida entrada\nerror -> código HTTP'),
           (276, 'Service', 'Reglas R1–R7\nalertRules (puras)'),
           (368, 'Repository', 'Solo SQL, transacciones\npostgres.js')]
@@ -140,7 +140,7 @@ def build(path):
     s += bl([
         '<b>Capas separadas.</b> El <i>router</i> resuelve método y ruta; el <i>controller</i> valida la entrada con Zod (esquemas estrictos: un campo desconocido es error 400) y traduce errores de dominio a códigos HTTP; el <i>service</i> aplica las reglas de negocio; el <i>repository</i> es la única capa con SQL. '
         'Las decisiones de alertas viven en funciones puras (<font name="Mono">alertRules.ts</font>), fáciles de probar sin base de datos.',
-        '<b>Un solo punto de entrada.</b> Una función serverless <font name="Mono">api/v1/[...route].ts</font> atiende toda la API con un router propio; así se evita el límite de funciones del plan gratuito de Vercel y las rutas con parámetros quedan en un solo sitio.',
+        '<b>Un solo punto de entrada.</b> Una función serverless <font name="Mono">api/v1/dispatch.ts</font> atiende toda la API con un router propio; así se evita el límite de funciones del plan gratuito de Vercel y las rutas con parámetros quedan en un solo sitio.',
         '<b>Identidad.</b> El dueño de cada recurso es el <font name="Mono">sub</font> del token de Clerk, nunca un dato del cuerpo. Un recurso de otro usuario responde 404 (no 403) para no revelar que existe. Las tareas internas se protegen con <font name="Mono">CRON_SECRET</font> comparado en tiempo constante.',
         '<b>Preparada para eventos.</b> Cada alerta escribe un evento en la tabla <font name="Mono">domain_events</font> (patrón <i>outbox</i>) dentro de la misma transacción, lo que deja listo el enganche para notificaciones o procesos asíncronos sin acoplar el servicio.',
     ])

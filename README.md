@@ -97,7 +97,7 @@ API propia, versionada en `/api/v1`, con base de datos Postgres (Supabase en pro
 ### Arquitectura
 
 ```
-Android (Retrofit)  →  api/v1/[...route].ts  →  Router  →  Controller  →  Service  →  Repository  →  Postgres
+Android (Retrofit)  →  api/v1/dispatch.ts  →  Router  →  Controller  →  Service  →  Repository  →  Postgres
                                                   │            │            │             │
                                                   │            │            │             └─ solo SQL (lib/*/repository.ts)
                                                   │            │            └─ reglas de negocio (lib/*/service.ts, lib/prices/alertRules.ts)

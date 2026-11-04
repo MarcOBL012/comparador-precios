@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "/api/v1/dispatch?path=:path*" }
+  ],
   "crons": [
     { "path": "/api/v1/internal/check-due", "schedule": "0 11 * * *" }
   ]
