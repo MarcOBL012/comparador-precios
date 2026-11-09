@@ -158,15 +158,23 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador npm run d
 TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador npm test   # unitarios + integración
 ```
 
-Para levantar la API en local (`vercel dev`, puerto 3000) define en `.env.local`:
+Para levantar la API en local (`http://localhost:3000/api/v1`, sin cuenta de Vercel) usa `npm run dev:api`, que arranca un servidor mínimo (`scripts/dev-server.ts`) con el mismo router que usa Vercel. Lee las variables del entorno de la terminal (no de `.env.local`).
 
-```
-DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador
-AUTH_DEV_MODE=1        # permite el encabezado X-Dev-User en lugar de un token de Clerk
-CRON_SECRET=cualquier-texto
+PowerShell:
+
+```powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:54329/comparador"; $env:AUTH_DEV_MODE="1"; $env:CRON_SECRET="cambia-esto"; npm run dev:api
 ```
 
-`AUTH_DEV_MODE` se ignora cuando corre en Vercel.
+Bash:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador AUTH_DEV_MODE=1 CRON_SECRET=cambia-esto npm run dev:api
+```
+
+- `AUTH_DEV_MODE=1` permite el encabezado `X-Dev-User` en lugar de un token de Clerk, y se ignora cuando corre en Vercel.
+- `CRON_SECRET=cambia-esto` es el valor que ya trae la colección de Postman (`cronSecret`).
+- Si prefieres emular Vercel completo, `vercel dev` también funciona, pero requiere una cuenta y `vercel link`.
 
 ### Probar con Postman
 
