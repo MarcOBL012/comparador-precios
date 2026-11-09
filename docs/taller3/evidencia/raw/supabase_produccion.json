@@ -1,0 +1,51 @@
+{
+  "consultado": "2026-11-08 23:25 (hora Peru) - proyecto Supabase DAIS, rama main (PRODUCTION)",
+  "filas_por_tabla": [
+    {"tabla": "alerts", "filas": 1},
+    {"tabla": "app_users", "filas": 2},
+    {"tabla": "domain_events", "filas": 10},
+    {"tabla": "price_observations", "filas": 24},
+    {"tabla": "products", "filas": 3},
+    {"tabla": "store_listings", "filas": 6},
+    {"tabla": "stores", "filas": 8},
+    {"tabla": "watches", "filas": 3}
+  ],
+  "watches": [
+    {"producto": "Anti-Comezón Menta Extra Refrescante", "presentacion": "250ml", "objetivo": "22.00", "estado": "activa", "ultima_revision_lima": "2026-11-08 23:00:44", "creado_lima": "2026-11-08 22:59:02"},
+    {"producto": "BLOQUEADOR SOLAR SPF 50 PARA USO DIARIO", "presentacion": "110ML", "objetivo": "41.27", "estado": "alcanzada", "ultima_revision_lima": "2026-11-04 06:22:35", "creado_lima": "2026-11-03 20:40:35"},
+    {"producto": "Agua Mineral de Manantial", "presentacion": "", "objetivo": "1.20", "estado": "activa", "ultima_revision_lima": "2026-11-08 06:22:36", "creado_lima": "2026-11-03 20:23:11"}
+  ],
+  "observaciones_recientes": [
+    {"observado_lima": "2026-11-08 23:00:44", "tienda": "Falabella", "precio": "27.70", "fuente": "shopping", "titulo": "Shampoo Head & Shoulders Anti Comezón"},
+    {"observado_lima": "2026-11-08 06:22:36", "tienda": "Metro", "precio": "7.90", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Bidón 7L"},
+    {"observado_lima": "2026-11-08 06:22:36", "tienda": "Wong", "precio": "2.10", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Botella 600ml"},
+    {"observado_lima": "2026-11-08 06:22:36", "tienda": "Plaza Vea", "precio": "2.00", "fuente": "directa", "titulo": "Agua Mineral SAN MATEO Con Gas Botella 600ml"},
+    {"observado_lima": "2026-11-07 06:22:35", "tienda": "Wong", "precio": "2.10", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Botella 600ml"},
+    {"observado_lima": "2026-11-07 06:22:35", "tienda": "Metro", "precio": "7.90", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Bidón 7L"},
+    {"observado_lima": "2026-11-07 06:22:35", "tienda": "Plaza Vea", "precio": "2.00", "fuente": "directa", "titulo": "Agua Mineral SAN MATEO Con Gas Botella 600ml"},
+    {"observado_lima": "2026-11-06 06:22:43", "tienda": "Wong", "precio": "2.10", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Botella 600ml"},
+    {"observado_lima": "2026-11-06 06:22:43", "tienda": "Metro", "precio": "7.90", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Bidón 7L"},
+    {"observado_lima": "2026-11-06 06:22:43", "tienda": "Plaza Vea", "precio": "2.00", "fuente": "directa", "titulo": "Agua Mineral SAN MATEO Con Gas Botella 600ml"},
+    {"observado_lima": "2026-11-05 06:22:36", "tienda": "Wong", "precio": "2.10", "fuente": "directa", "titulo": "Agua Sin Gas Mineral San Mateo Botella 600ml"},
+    {"observado_lima": "2026-11-05 06:22:36", "tienda": "Plaza Vea", "precio": "2.00", "fuente": "directa", "titulo": "Agua Mineral SAN MATEO Con Gas Botella 600ml"}
+  ],
+  "observaciones_por_dia": [
+    {"dia": "2026-11-08", "observaciones": 4, "primera_hora_lima": "06:22:36"},
+    {"dia": "2026-11-07", "observaciones": 3, "primera_hora_lima": "06:22:35"},
+    {"dia": "2026-11-06", "observaciones": 3, "primera_hora_lima": "06:22:43"},
+    {"dia": "2026-11-05", "observaciones": 3, "primera_hora_lima": "06:22:36"},
+    {"dia": "2026-11-04", "observaciones": 5, "primera_hora_lima": "06:22:35"},
+    {"dia": "2026-11-03", "observaciones": 6, "primera_hora_lima": "20:23:28"}
+  ],
+  "alertas": [
+    {"id": 5, "tipo": "objetivo_alcanzado", "creada_lima": "2026-11-04 06:22:35", "leida_lima": "2026-11-08 23:01:45"}
+  ],
+  "esquema": {"tablas": 19, "claves_foraneas": 21, "unique": 11, "checks": 26, "triggers": 6},
+  "migraciones": [
+    {"version": "20261103184149", "name": "001_extensiones_y_catalogos"},
+    {"version": "20261103184209", "name": "002_catalogo_y_precios"},
+    {"version": "20261103184231", "name": "003_usuarios_seguimientos_alertas"},
+    {"version": "20261103184248", "name": "004_confirmaciones_y_eventos"},
+    {"version": "20261103184306", "name": "005_endurecimiento"}
+  ]
+}
