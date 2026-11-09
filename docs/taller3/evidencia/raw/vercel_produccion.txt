@@ -1,0 +1,72 @@
+# Captura: 2026-11-09T04:22:11Z (UTC) contra produccion en Vercel
+
+### GET https://comparador-precios-marco-obl.vercel.app/api/health
+HTTP/1.1 200 OK
+Content-Length: 15
+Content-Type: application/json; charset=utf-8
+Date: Mon, 09 Nov 2026 04:22:12 GMT
+Etag: W/"f-VaSQ4oDUiZblZNAEkkN+sX+q3Sg"
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Robots-Tag: noindex
+X-Vercel-Id: gru1::iad1::c9fvj-1794198131858-4f15ffd4a4ba
+
+{"status":"ok"}
+
+
+### GET https://comparador-precios-marco-obl.vercel.app/api/v1/watches
+HTTP/1.1 401 Unauthorized
+Content-Length: 84
+Content-Type: application/json; charset=utf-8
+Date: Mon, 09 Nov 2026 04:22:13 GMT
+Etag: W/"54-xQKj7C+4j56SSMnq3nvTd7L5eT4"
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Robots-Tag: noindex
+X-Vercel-Id: gru1::iad1::7m787-1794198132917-ad30c42706e1
+
+{"error":"No autenticado. Inicia sesión para continuar.","codigo":"no_autenticado"}
+
+
+### GET https://comparador-precios-marco-obl.vercel.app/api/v1/alerts
+HTTP/1.1 401 Unauthorized
+Content-Length: 84
+Content-Type: application/json; charset=utf-8
+Date: Mon, 09 Nov 2026 04:22:14 GMT
+Etag: W/"54-xQKj7C+4j56SSMnq3nvTd7L5eT4"
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Robots-Tag: noindex
+X-Vercel-Id: gru1::iad1::4g8t9-1794198133979-ac3feafd1da2
+
+{"error":"No autenticado. Inicia sesión para continuar.","codigo":"no_autenticado"}
+
+
+### GET https://comparador-precios-marco-obl.vercel.app/api/v1/internal/check-due
+HTTP/1.1 401 Unauthorized
+Content-Length: 64
+Content-Type: application/json; charset=utf-8
+Date: Mon, 09 Nov 2026 04:22:14 GMT
+Etag: W/"40-e5u5PxKdVyxJQpnKEKm71bS9obk"
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Robots-Tag: noindex
+X-Vercel-Id: gru1::iad1::5scw9-1794198134436-680c3fe57e82
+
+{"error":"Secreto de cron inválido.","codigo":"no_autenticado"}
+
+
+### PUT https://comparador-precios-marco-obl.vercel.app/api/v1/watches
+HTTP/1.1 405 Method Not Allowed
+Allow: POST, GET
+Content-Length: 79
+Content-Type: application/json; charset=utf-8
+Date: Mon, 09 Nov 2026 04:22:14 GMT
+Etag: W/"4f-mroxa/tu2mMpuJbAPGEOIKZUcOI"
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Robots-Tag: noindex
+X-Vercel-Id: gru1::iad1::zx44d-1794198134889-6a8b979d423b
+
+{"error":"Método no permitido para esta ruta.","codigo":"metodo_no_permitido"}
+

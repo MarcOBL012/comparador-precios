@@ -1,0 +1,137 @@
+newman
+
+API de seguimiento de precios (Taller 3)
+
+□ 1. Seguimientos (CRUD)
+└ Crear seguimiento
+  POST http://localhost:3000/api/v1/watches [201 Created, 686B, 373ms]
+  √  Responde 201
+  √  Guarda el id
+  √  Trae Location
+
+└ Crear repetido → 409
+  POST http://localhost:3000/api/v1/watches [409 Conflict, 242B, 28ms]
+  √  Responde 409
+  √  codigo ya_seguido
+
+└ Crear con datos inválidos → 400
+  POST http://localhost:3000/api/v1/watches [400 Bad Request, 614B, 9ms]
+  √  Responde 400
+  √  Detalla los campos
+
+└ Listar
+  GET http://localhost:3000/api/v1/watches?limit=10 [200 OK, 661B, 15ms]
+  √  Responde 200
+
+└ Listar con parámetro inválido → 400
+  GET http://localhost:3000/api/v1/watches?limit=500 [400 Bad Request, 338B, 5ms]
+  √  Responde 400
+
+└ Detalle
+  GET http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [200 OK, 617B, 12ms]
+  √  Responde 200
+
+└ Detalle de id inexistente → 404
+  GET http://localhost:3000/api/v1/watches/00000000-0000-4000-8000-000000000000 [404 Not Found, 253B, 17ms]
+  √  Responde 404
+
+└ Detalle con id mal formado → 400
+  GET http://localhost:3000/api/v1/watches/no-es-uuid [400 Bad Request, 299B, 4ms]
+  √  Responde 400
+
+└ Cambiar objetivo
+  PATCH http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [200 OK, 615B, 25ms]
+  √  Responde 200
+
+└ Pausar
+  PATCH http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [200 OK, 616B, 21ms]
+  √  Responde 200
+
+└ Estado que el usuario no puede pedir → 400
+  PATCH http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [400 Bad Request, 353B, 6ms]
+  √  Responde 400
+
+└ Revisar un seguimiento pausado → 409
+  POST http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2/check [409 Conflict, 294B, 14ms]
+  √  Responde 409
+
+└ Reactivar
+  PATCH http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [200 OK, 615B, 18ms]
+  √  Responde 200
+
+└ Sin sesión → 401
+  GET http://localhost:3000/api/v1/watches [401 Unauthorized, 272B, 5ms]
+  √  Responde 401
+
+└ Método no permitido → 405
+  PUT http://localhost:3000/api/v1/watches [405 Method Not Allowed, 291B, 3ms]
+  √  Responde 405
+
+□ 2. Precios y alertas (lógica de negocio)
+└ Revisar ahora
+  POST http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2/check [200 OK, 1.07kB, 820ms]
+  √  200 (ofertas) o 502 (tiendas caídas)
+
+└ Revisar otra vez enseguida → 429
+  POST http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2/check [429 Too Many Requests, 320B, 11ms]
+  √  429 con Retry-After (o 502)
+
+└ Historial
+  GET http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2/history?days=30 [200 OK, 734B, 21ms]
+  √  Responde 200
+  √  Trae estadísticas
+
+└ Historial con days inválido → 400
+  GET http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2/history?days=9999 [400 Bad Request, 338B, 3ms]
+  √  Responde 400
+
+└ Listar alertas
+  GET http://localhost:3000/api/v1/alerts?unread=false [200 OK, 585B, 21ms]
+  √  Responde 200
+  √  Guarda la primera alerta si hay
+
+└ Marcar alerta como leída
+  PATCH http://localhost:3000/api/v1/alerts/48 [200 OK, 528B, 19ms]
+  √  200 si hay alerta, 404 si no
+
+└ Marcar alerta con cuerpo inválido → 400
+  PATCH http://localhost:3000/api/v1/alerts/1 [400 Bad Request, 314B, 4ms]
+  √  Responde 400
+
+□ 3. Limpieza y cron
+└ Cron sin secreto → 401
+  GET http://localhost:3000/api/v1/internal/check-due [401 Unauthorized, 252B, 5ms]
+  √  Responde 401
+
+└ Cron con secreto
+  GET http://localhost:3000/api/v1/internal/check-due [200 OK, 217B, 7ms]
+  √  Responde 200
+  √  Resume la corrida
+
+└ Eliminar seguimiento
+  DELETE http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [204 No Content, 111B, 12ms]
+  √  Responde 204
+
+└ Eliminar otra vez → 404
+  DELETE http://localhost:3000/api/v1/watches/ebb261cd-f170-4b95-83c9-7c4d9c4d87a2 [404 Not Found, 253B, 7ms]
+  √  Responde 404
+
+┌─────────────────────────┬───────────────────┬───────────────────┐
+│                         │          executed │            failed │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│              iterations │                 1 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│                requests │                26 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│            test-scripts │                33 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│      prerequest-scripts │                 0 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│              assertions │                33 │                 0 │
+├─────────────────────────┴───────────────────┴───────────────────┤
+│ total run duration: 3.7s                                        │
+├─────────────────────────────────────────────────────────────────┤
+│ total data received: 6.69kB (approx)                            │
+├─────────────────────────────────────────────────────────────────┤
+│ average response time: 57ms [min: 3ms, max: 820ms, s.d.: 167ms] │
+└─────────────────────────────────────────────────────────────────┘

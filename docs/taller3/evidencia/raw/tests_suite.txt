@@ -1,0 +1,34 @@
+ ✓ test/matching.test.ts (20 tests) 10ms
+ ✓ test/prices/alertRules.test.ts (15 tests) 25ms
+ ✓ test/stores/vtexSearch.test.ts (7 tests) 12ms
+ ✓ test/stores/googleSearch.test.ts (6 tests) 18ms
+ ✓ test/stores/googleShopping.test.ts (15 tests) 47ms
+ ✓ test/searchStores.test.ts (15 tests) 22ms
+ ✓ test/watches/service.test.ts (15 tests) 26ms
+ ✓ test/scanHandler.test.ts (15 tests) 35ms
+ ✓ test/stores/nearbyStores.test.ts (5 tests) 14ms
+    at startTests (file:///C:/Users/curay/OneDrive/Documentos/AppDAIS/comparador-precios/node_modules/@vitest/runner/dist/index.js:1271:3) {
+ ✓ test/prices.test.ts (5 tests) 10ms
+    at startTests (file:///C:/Users/curay/OneDrive/Documentos/AppDAIS/comparador-precios/node_modules/@vitest/runner/dist/index.js:1271:3) {
+    at startTests (file:///C:/Users/curay/OneDrive/Documentos/AppDAIS/comparador-precios/node_modules/@vitest/runner/dist/index.js:1271:3)
+ ✓ test/scan.test.ts (6 tests) 24ms
+ ✓ test/route.test.ts (5 tests) 9ms
+ ✓ test/auth.test.ts (5 tests) 10ms
+ ✓ test/watches/api.test.ts (13 tests) 256ms
+ ✓ test/extrasHandler.test.ts (9 tests) 159ms
+ ✓ test/productInsights.test.ts (5 tests) 11ms
+ ✓ test/identifyProduct.test.ts (3 tests) 18ms
+    at startTests (file:///C:/Users/curay/OneDrive/Documentos/AppDAIS/comparador-precios/node_modules/@vitest/runner/dist/index.js:1271:3) {
+ ✓ test/scanIntegration.test.ts (2 tests) 22ms
+ ✓ test/productIdentification.test.ts (6 tests) 13ms
+ ✓ test/authDev.test.ts (4 tests) 10ms
+ ✓ test/errors.test.ts (2 tests) 6ms
+ ✓ test/stores/plazaVea.test.ts (2 tests) 11ms
+ ✓ test/stores/departmentStores.test.ts (3 tests) 9ms
+ ✓ test/stores/wong.test.ts (2 tests) 9ms
+ ✓ test/health.test.ts (1 test) 5ms
+    at startTests (file:///C:/Users/curay/OneDrive/Documentos/AppDAIS/comparador-precios/node_modules/@vitest/runner/dist/index.js:1271:3)
+ ✓ test/integration/api.pg.test.ts (13 tests) 2988ms
+ Test Files  26 passed (26)
+      Tests  199 passed (199)
+   Duration  7.11s (transform 8.31s, setup 0ms, collect 20.29s, tests 3.78s, environment 14ms, prepare 13.70s)
