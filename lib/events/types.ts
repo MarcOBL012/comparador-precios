@@ -65,10 +65,16 @@ export interface EventStats {
   porConsumidor: Record<string, ConsumerStats>;
 }
 
+/** Acota qué entregas se reclaman (por ejemplo, solo las de una petición y solo ciertos consumidores). */
+export interface ClaimFilter {
+  correlationId?: string;
+  consumers?: readonly string[];
+}
+
 /** Cola de entregas. La implementa Postgres en producción y una versión en memoria en las pruebas. */
 export interface EventQueue {
   /** Reclama hasta `limit` entregas listas y las marca en curso por `lockSeconds`. */
-  claim(limit: number, lockSeconds: number): Promise<Delivery[]>;
+  claim(limit: number, lockSeconds: number, filter?: ClaimFilter): Promise<Delivery[]>;
   ack(eventId: number, consumer: string): Promise<void>;
   /** Falló, pero se puede reintentar dentro de `retryInSeconds`. */
   fail(eventId: number, consumer: string, error: string, retryInSeconds: number): Promise<void>;

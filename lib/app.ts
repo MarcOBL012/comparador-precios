@@ -1,19 +1,12 @@
 import { authenticate } from './auth.js';
+import { buildDomain, isEventAlertsEnabled } from './compose.js';
 import { getSql } from './db/client.js';
-import { PgEventBus } from './events/bus.js';
-import { MetricsRecorder } from './events/consumers/metricsRecorder.js';
 import { EventController } from './events/controller.js';
-import { EventDispatcher } from './events/dispatcher.js';
-import { PgEventQueue } from './events/repository.js';
-import { ConsumerRegistry } from './events/subscriptions.js';
+import type { EventDispatcher } from './events/dispatcher.js';
 import { Router } from './http/router.js';
 import { PriceController } from './prices/controller.js';
 import { StoreSearchPriceProvider } from './prices/provider.js';
-import { PgPriceRepository } from './prices/repository.js';
-import { PriceService } from './prices/service.js';
 import { WatchController } from './watches/controller.js';
-import { PgWatchRepository } from './watches/repository.js';
-import { WatchService } from './watches/service.js';
 
 export interface AppControllers {
   watches: WatchController;
@@ -59,23 +52,16 @@ interface App {
 
 let cached: App | undefined;
 
-/** Raíz de composición: aquí (y solo aquí) se conectan base de datos → repositorios → servicios → controladores. */
+/** Un cliente por instancia de la función serverless: la composición del dominio vive en `compose.ts`. */
 function getApp(): App {
   if (!cached) {
-    const sql = getSql();
-    // Consumidores de eventos: cada uno se suscribe a los tipos que declara. Las fases siguientes
-    // agregan aquí AlertEvaluator, WatchChecker, NotificationDispatcher, etc.
-    const registry = new ConsumerRegistry([new MetricsRecorder()]);
-    const bus = new PgEventBus((type) => registry.consumersFor(type));
-    const queue = new PgEventQueue(sql);
-    const dispatcher = new EventDispatcher(queue, registry);
-    const watchRepo = new PgWatchRepository(sql);
+    const domain = buildDomain({ sql: getSql(), provider: new StoreSearchPriceProvider(), events: isEventAlertsEnabled() });
     cached = {
-      dispatcher,
+      dispatcher: domain.dispatcher,
       router: buildRouter({
-        watches: new WatchController(new WatchService(watchRepo)),
-        prices: new PriceController(new PriceService(watchRepo, new PgPriceRepository(sql, bus), new StoreSearchPriceProvider())),
-        events: new EventController(dispatcher, queue),
+        watches: new WatchController(domain.watchService),
+        prices: new PriceController(domain.priceService),
+        events: new EventController(domain.dispatcher, domain.queue),
       }),
     };
   }

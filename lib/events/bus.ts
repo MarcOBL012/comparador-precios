@@ -23,6 +23,9 @@ export interface EventBus {
  */
 export const isDispatchEnabled = (): boolean => process.env.EVENTS_DISPATCH === 'on';
 
+/** Los únicos tipos que se publicaban antes del bus: con el despacho apagado, los demás no se escriben. */
+const LEGACY_TYPES: ReadonlySet<EventType> = new Set<EventType>(['watch.checked', 'alert.created']);
+
 export class PgEventBus implements EventBus {
   constructor(
     /** Nombres de los consumidores suscritos a un tipo: una fila de entrega por cada uno. */
@@ -35,6 +38,10 @@ export class PgEventBus implements EventBus {
     const payload = validatePayload(input.type, input.payload);
 
     if (!this.enabled()) {
+      // Sin despacho, un tipo nuevo no tendría quién lo lea: no se guarda (producción sigue igual que antes).
+      if (!LEGACY_TYPES.has(input.type)) {
+        return null;
+      }
       const [legacy] = await tx<{ id: string }[]>`
         insert into public.domain_events (aggregate_type, aggregate_id, event_type, payload)
         values (${input.aggregateType}, ${input.aggregateId}, ${input.type}, ${tx.json(payload)})

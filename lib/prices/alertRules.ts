@@ -14,6 +14,19 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  *  R4  objetivo_alcanzado: el mejor precio llegó al objetivo y el seguimiento estaba activo;
  *  R5  minimo_historico: el mejor precio es menor al mínimo anterior (con al menos 3 observaciones previas).
  */
+/**
+ * R6 como filtro independiente (el «procesador» previo de la revisión por eventos): descarta las
+ * ofertas por debajo del 40 % de la mediana histórica, si hay al menos 3 observaciones previas.
+ */
+export function filterOutliers(offers: Offer[], stats: HistoryStats): { keep: Offer[]; descartadas: number } {
+  const hasHistory = stats.observaciones >= MIN_OBSERVATIONS;
+  const keep =
+    hasHistory && stats.mediana !== null
+      ? offers.filter((o) => o.precio >= stats.mediana! * OUTLIER_RATIO)
+      : offers;
+  return { keep, descartadas: offers.length - keep.length };
+}
+
 export function decide(input: {
   objetivo: number | null;
   estado: WatchStatus;
@@ -22,11 +35,7 @@ export function decide(input: {
 }): Decision {
   const { objetivo, estado, stats, offers } = input;
   const hasHistory = stats.observaciones >= MIN_OBSERVATIONS;
-  const keep =
-    hasHistory && stats.mediana !== null
-      ? offers.filter((o) => o.precio >= stats.mediana! * OUTLIER_RATIO)
-      : offers;
-  const descartadas = offers.length - keep.length;
+  const { keep, descartadas } = filterOutliers(offers, stats);
   const mejor = keep.reduce<Offer | null>((best, o) => (best === null || o.precio < best.precio ? o : best), null);
 
   const alertas: AlertTypeCode[] = [];

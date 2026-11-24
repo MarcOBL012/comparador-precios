@@ -1,6 +1,7 @@
 import type { Sql } from '../db/client.js';
 import { PG, pgCode } from '../db/client.js';
 import { ConflictError } from '../errors.js';
+import { PgEventBus, type EventBus } from '../events/bus.js';
 import type { Categoria } from '../productIdentification.js';
 import type { ProductInput, Watch, WatchListQuery, WatchPatch, WatchRepository, WatchStatus } from './types.js';
 
@@ -83,7 +84,11 @@ function toWatch(row: WatchRow): Watch {
 }
 
 export class PgWatchRepository implements WatchRepository {
-  constructor(private readonly sql: Sql) {}
+  constructor(
+    private readonly sql: Sql,
+    /** Por defecto un bus sin consumidores: con el despacho apagado no escribe nada de lo nuevo. */
+    private readonly bus: EventBus = new PgEventBus()
+  ) {}
 
   async ensureUser(clerkId: string): Promise<string> {
     const [row] = await this.sql<{ id: string }[]>`
@@ -120,11 +125,21 @@ export class PgWatchRepository implements WatchRepository {
 
   async insertWatch(userId: string, productId: string, precioObjetivo: number | null): Promise<string> {
     try {
-      const [row] = await this.sql<{ id: string }[]>`
-        insert into public.watches (user_id, product_id, target_price)
-        values (${userId}, ${productId}, ${precioObjetivo})
-        returning id`;
-      return row.id;
+      // El alta y su evento se guardan juntos (outbox): nunca hay un seguimiento sin su `watch.created`.
+      return await this.sql.begin(async (tx) => {
+        const [row] = await tx<{ id: string }[]>`
+          insert into public.watches (user_id, product_id, target_price)
+          values (${userId}, ${productId}, ${precioObjetivo})
+          returning id`;
+        await this.bus.publish(tx, {
+          type: 'watch.created',
+          aggregateType: 'watch',
+          aggregateId: row.id,
+          payload: { watchId: row.id, productId, precioObjetivo },
+          actor: `user:${userId}`,
+        });
+        return row.id;
+      });
     } catch (err) {
       if (pgCode(err) === PG.UNIQUE_VIOLATION) {
         throw new ConflictError('Ya sigues este producto.', 'ya_seguido');
@@ -167,10 +182,36 @@ export class PgWatchRepository implements WatchRepository {
       changes.status_code = patch.estado;
     }
     try {
-      const rows = await this.sql`
-        update public.watches set ${this.sql(changes)}
-        where id = ${id} and user_id = ${userId} returning id`;
-      return rows.length > 0;
+      return await this.sql.begin(async (tx) => {
+        const [before] = await tx<{ product_id: string; target: number | null; status_code: WatchStatus }[]>`
+          select product_id, target_price::float8 as target, status_code
+          from public.watches where id = ${id} and user_id = ${userId} for update`;
+        if (!before) {
+          return false;
+        }
+        await tx`update public.watches set ${tx(changes)} where id = ${id} and user_id = ${userId}`;
+
+        const actor = `user:${userId}`;
+        if (patch.precioObjetivo !== undefined && patch.precioObjetivo !== before.target) {
+          await this.bus.publish(tx, {
+            type: 'watch.target_changed',
+            aggregateType: 'watch',
+            aggregateId: id,
+            payload: { watchId: id, productId: before.product_id, anterior: before.target, nuevo: patch.precioObjetivo },
+            actor,
+          });
+        }
+        if (patch.estado !== undefined && patch.estado !== before.status_code) {
+          await this.bus.publish(tx, {
+            type: patch.estado === 'pausada' ? 'watch.paused' : 'watch.reactivated',
+            aggregateType: 'watch',
+            aggregateId: id,
+            payload: { watchId: id },
+            actor,
+          });
+        }
+        return true;
+      });
     } catch (err) {
       // La base es la última defensa: el trigger rechaza una transición que el servicio no atrapó.
       if (pgCode(err) === PG.CHECK_VIOLATION) {
@@ -181,8 +222,20 @@ export class PgWatchRepository implements WatchRepository {
   }
 
   async remove(userId: string, id: string): Promise<boolean> {
-    const rows = await this.sql`
-      delete from public.watches where id = ${id} and user_id = ${userId} returning id`;
-    return rows.length > 0;
+    return this.sql.begin(async (tx) => {
+      const rows = await tx<{ product_id: string }[]>`
+        delete from public.watches where id = ${id} and user_id = ${userId} returning product_id`;
+      if (rows.length === 0) {
+        return false;
+      }
+      await this.bus.publish(tx, {
+        type: 'watch.deleted',
+        aggregateType: 'watch',
+        aggregateId: id,
+        payload: { watchId: id, productId: rows[0].product_id },
+        actor: `user:${userId}`,
+      });
+      return true;
+    });
   }
 }

@@ -2,6 +2,7 @@ import type { TransactionSql } from 'postgres';
 import type { Sql } from '../db/client.js';
 import { PgEventBus, type EventBus } from '../events/bus.js';
 import type { WatchStatus } from '../watches/types.js';
+import { filterOutliers } from './alertRules.js';
 import type {
   AlertRecord,
   AlertTypeCode,
@@ -9,8 +10,10 @@ import type {
   Decision,
   HistoryPoint,
   HistoryStats,
+  ObservationOutcome,
   Offer,
   PriceRepository,
+  RecordContext,
   WatchRef,
 } from './types.js';
 
@@ -95,21 +98,7 @@ export class PgPriceRepository implements PriceRepository {
 
       const decision = decide({ minimo: stats.minimo, observaciones: stats.n, mediana: stats.mediana });
 
-      const observationIds = new Map<Offer, number>();
-      for (const offer of decision.keep) {
-        const [store] = await tx<{ id: number }[]>`
-          insert into public.stores (slug, nombre) values (${storeSlug(offer.tienda)}, ${offer.tienda})
-          on conflict (slug) do update set slug = stores.slug returning id`;
-        const [listing] = await tx<{ id: string }[]>`
-          insert into public.store_listings (product_id, store_id, titulo, url)
-          values (${watch.productId}, ${store.id}, ${offer.titulo}, ${offer.url})
-          on conflict (product_id, store_id) do update set titulo = excluded.titulo, url = excluded.url
-          returning id::text as id`;
-        const [obs] = await tx<{ id: string }[]>`
-          insert into public.price_observations (listing_id, source_code, precio)
-          values (${listing.id}, ${offer.fuente}, ${offer.precio}) returning id::text as id`;
-        observationIds.set(offer, Number(obs.id));
-      }
+      const observationIds = await this.saveOffers(tx, watch.productId, decision.keep);
 
       const alertIds: number[] = [];
       if (decision.mejor) {
@@ -149,6 +138,82 @@ export class PgPriceRepository implements PriceRepository {
         : [];
       return { decision, alertas, estado };
     });
+  }
+
+  /** Guarda tienda, publicación y observación de cada oferta; devuelve el id de la observación de cada una. */
+  private async saveOffers(tx: TransactionSql, productId: string, offers: Offer[]): Promise<Map<Offer, number>> {
+    const observationIds = new Map<Offer, number>();
+    for (const offer of offers) {
+      const [store] = await tx<{ id: number }[]>`
+        insert into public.stores (slug, nombre) values (${storeSlug(offer.tienda)}, ${offer.tienda})
+        on conflict (slug) do update set slug = stores.slug returning id`;
+      const [listing] = await tx<{ id: string }[]>`
+        insert into public.store_listings (product_id, store_id, titulo, url)
+        values (${productId}, ${store.id}, ${offer.titulo}, ${offer.url})
+        on conflict (product_id, store_id) do update set titulo = excluded.titulo, url = excluded.url
+        returning id::text as id`;
+      const [obs] = await tx<{ id: string }[]>`
+        insert into public.price_observations (listing_id, source_code, precio)
+        values (${listing.id}, ${offer.fuente}, ${offer.precio}) returning id::text as id`;
+      observationIds.set(offer, Number(obs.id));
+    }
+    return observationIds;
+  }
+
+  /**
+   * Revisión por eventos: guarda las ofertas (ya sin las atípicas) y publica UN `watch.checked` con la
+   * mejor oferta y el historial previo, todo en una transacción. NO decide ni crea alertas: de eso se
+   * encarga el AlertEvaluator, que además lo hace para todos los que siguen el producto.
+   */
+  async recordObservations(watch: WatchRef, offers: Offer[], ctx: RecordContext = {}): Promise<ObservationOutcome> {
+    return this.sql.begin(async (tx) => {
+      // Mismo bloqueo que el modo anterior: dos revisiones simultáneas del mismo seguimiento se serializan.
+      await tx`select status_code from public.watches where id = ${watch.id} for update`;
+      const [row] = await tx<{ minimo: number | null; n: number; mediana: number | null }[]>`
+        select min(o.precio)::float8 as minimo, count(*)::int as n,
+               (percentile_cont(0.5) within group (order by o.precio))::float8 as mediana
+        from public.price_observations o
+        join public.store_listings l on l.id = o.listing_id
+        where l.product_id = ${watch.productId}`;
+      const statsPrevias: HistoryStats = { minimo: row.minimo, observaciones: row.n, mediana: row.mediana };
+
+      const { keep, descartadas } = filterOutliers(offers, statsPrevias);
+      const observationIds = await this.saveOffers(tx, watch.productId, keep);
+      const best = keep.reduce<Offer | null>((b, o) => (b === null || o.precio < b.precio ? o : b), null);
+      const mejor = best ? { ...best, observationId: observationIds.get(best)! } : null;
+
+      await tx`update public.watches set last_checked_at = now() where id = ${watch.id}`;
+      await this.bus.publish(tx, {
+        type: 'watch.checked',
+        aggregateType: 'watch',
+        aggregateId: watch.id,
+        correlationId: ctx.correlationId ?? null,
+        causationId: ctx.causationId ?? null,
+        actor: ctx.actor ?? 'system',
+        payload: {
+          ofertas: keep.length,
+          descartadas,
+          productId: watch.productId,
+          mejor: mejor ? { observationId: mejor.observationId, precio: mejor.precio, tienda: mejor.tienda } : null,
+          statsPrevias,
+        },
+      });
+      return { guardadas: keep.length, descartadas, mejor, statsPrevias };
+    });
+  }
+
+  async alertsOfObservation(watchId: string, observationId: number): Promise<AlertRecord[]> {
+    const { sql } = this;
+    const rows = await sql<AlertRow[]>`
+      ${selectAlerts(sql)} where a.watch_id = ${watchId} and a.observation_id = ${observationId} order by a.id`;
+    return rows.map(toAlert);
+  }
+
+  /** Alertas nacidas de una corrida del cron: los `alert.created` que heredaron su correlación. */
+  async countAlertsOfRun(correlationId: string): Promise<number> {
+    const [row] = await this.sql<{ n: number }[]>`
+      select count(*)::int as n from public.domain_events where event_type = 'alert.created' and correlation_id = ${correlationId}`;
+    return row.n;
   }
 
   async history(userId: string, watchId: string, since: Date): Promise<HistoryPoint[] | null> {

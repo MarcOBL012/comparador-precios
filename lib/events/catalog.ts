@@ -8,14 +8,40 @@ import { z } from 'zod';
  * Los esquemas son estrictos: un campo de más o de menos es un error del productor y se detecta al
  * publicar, no al consumir. Cada fase del plan agrega aquí los tipos que empieza a emitir.
  */
+const uuid = z.string().uuid();
+const nullablePrice = z.number().positive().nullable();
+
 export const EVENT_SCHEMAS = {
-  /** Una revisión de precios terminó (la guarda `PriceRepository.recordCheck`). */
+  /**
+   * Una revisión de precios terminó. Los campos opcionales los publica la revisión por eventos
+   * (`recordObservations`): con ellos el `AlertEvaluator` decide las alertas de TODOS los que siguen
+   * el producto sin volver a consultar nada. El modo anterior (`recordCheck`) publica solo los dos primeros.
+   */
   'watch.checked': z
     .object({
       ofertas: z.number().int().nonnegative(),
       descartadas: z.number().int().nonnegative(),
+      productId: uuid.optional(),
+      /** La mejor oferta guardada en esta revisión; null si no hubo ninguna. */
+      mejor: z
+        .object({ observationId: z.number().int().positive(), precio: z.number().positive(), tienda: z.string().min(1) })
+        .strict()
+        .nullable()
+        .optional(),
+      /** Historial del producto ANTES de esta revisión (las reglas R5 y R6 lo comparan con la oferta nueva). */
+      statsPrevias: z
+        .object({ minimo: nullablePrice, observaciones: z.number().int().nonnegative(), mediana: nullablePrice })
+        .strict()
+        .optional(),
     })
     .strict(),
+  'watch.created': z.object({ watchId: uuid, productId: uuid, precioObjetivo: nullablePrice }).strict(),
+  'watch.target_changed': z.object({ watchId: uuid, productId: uuid, anterior: nullablePrice, nuevo: nullablePrice }).strict(),
+  'watch.paused': z.object({ watchId: uuid }).strict(),
+  'watch.reactivated': z.object({ watchId: uuid }).strict(),
+  'watch.deleted': z.object({ watchId: uuid, productId: uuid }).strict(),
+  /** El scheduler pide revisar un seguimiento vencido (userId es el id interno, no un dato personal). */
+  'watch.check_requested': z.object({ watchId: uuid, userId: uuid, motivo: z.literal('programada') }).strict(),
   /** Se creó una alerta para un seguimiento. */
   'alert.created': z
     .object({
