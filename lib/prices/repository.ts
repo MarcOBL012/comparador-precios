@@ -1,5 +1,6 @@
 import type { TransactionSql } from 'postgres';
 import type { Sql } from '../db/client.js';
+import { PgEventBus, type EventBus } from '../events/bus.js';
 import type { WatchStatus } from '../watches/types.js';
 import type {
   AlertRecord,
@@ -69,7 +70,11 @@ function toAlert(row: AlertRow): AlertRecord {
 }
 
 export class PgPriceRepository implements PriceRepository {
-  constructor(private readonly sql: Sql) {}
+  constructor(
+    private readonly sql: Sql,
+    /** Por defecto un bus sin consumidores: publica en la bandeja igual que antes. */
+    private readonly bus: EventBus = new PgEventBus()
+  ) {}
 
   async recordCheck(
     watch: WatchRef,
@@ -123,15 +128,20 @@ export class PgPriceRepository implements PriceRepository {
       await tx`
         update public.watches set last_checked_at = now(), status_code = ${estado} where id = ${watch.id}`;
 
-      // Outbox: el evento se guarda en la MISMA transacción; un proceso aparte lo consume después.
-      await tx`
-        insert into public.domain_events (aggregate_type, aggregate_id, event_type, payload)
-        values ('watch', ${watch.id}, 'watch.checked',
-                ${tx.json({ ofertas: decision.keep.length, descartadas: decision.descartadas })})`;
+      // Outbox: los eventos se publican en la MISMA transacción; el despachador los entrega después.
+      await this.bus.publish(tx, {
+        type: 'watch.checked',
+        aggregateType: 'watch',
+        aggregateId: watch.id,
+        payload: { ofertas: decision.keep.length, descartadas: decision.descartadas },
+      });
       for (const id of alertIds) {
-        await tx`
-          insert into public.domain_events (aggregate_type, aggregate_id, event_type, payload)
-          values ('alert', ${String(id)}, 'alert.created', ${tx.json({ alertId: id, watchId: watch.id })})`;
+        await this.bus.publish(tx, {
+          type: 'alert.created',
+          aggregateType: 'alert',
+          aggregateId: String(id),
+          payload: { alertId: id, watchId: watch.id },
+        });
       }
 
       const alertas = alertIds.length

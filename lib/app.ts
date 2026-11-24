@@ -1,5 +1,11 @@
 import { authenticate } from './auth.js';
 import { getSql } from './db/client.js';
+import { PgEventBus } from './events/bus.js';
+import { MetricsRecorder } from './events/consumers/metricsRecorder.js';
+import { EventController } from './events/controller.js';
+import { EventDispatcher } from './events/dispatcher.js';
+import { PgEventQueue } from './events/repository.js';
+import { ConsumerRegistry } from './events/subscriptions.js';
 import { Router } from './http/router.js';
 import { PriceController } from './prices/controller.js';
 import { StoreSearchPriceProvider } from './prices/provider.js';
@@ -13,12 +19,14 @@ export interface AppControllers {
   watches: WatchController;
   /** Opcional solo para poder probar los seguimientos sin la parte de precios. */
   prices?: PriceController;
+  /** Endpoints internos del despachador de eventos (cron / webhook / a mano). */
+  events?: EventController;
 }
 
 /** Tabla de rutas de la API v1. Cada fila: método, ruta, quién puede llamarla y qué controlador la atiende. */
 export function buildRouter(controllers: AppControllers, auth = authenticate): Router {
   const router = new Router({ authenticate: auth });
-  const { watches, prices } = controllers;
+  const { watches, prices, events } = controllers;
   router
     .add('POST', '/watches', 'user', watches.create)
     .add('GET', '/watches', 'user', watches.list)
@@ -35,20 +43,45 @@ export function buildRouter(controllers: AppControllers, auth = authenticate): R
       .add('GET', '/internal/check-due', 'cron', prices.checkDue)
       .add('POST', '/internal/check-due', 'cron', prices.checkDue);
   }
+  if (events) {
+    router
+      .add('GET', '/internal/events/dispatch', 'cron', events.dispatch)
+      .add('POST', '/internal/events/dispatch', 'cron', events.dispatch)
+      .add('GET', '/internal/events/stats', 'cron', events.stats);
+  }
   return router;
 }
 
-let cached: Router | undefined;
+interface App {
+  router: Router;
+  dispatcher: EventDispatcher;
+}
+
+let cached: App | undefined;
 
 /** Raíz de composición: aquí (y solo aquí) se conectan base de datos → repositorios → servicios → controladores. */
-export function getRouter(): Router {
+function getApp(): App {
   if (!cached) {
     const sql = getSql();
+    // Consumidores de eventos: cada uno se suscribe a los tipos que declara. Las fases siguientes
+    // agregan aquí AlertEvaluator, WatchChecker, NotificationDispatcher, etc.
+    const registry = new ConsumerRegistry([new MetricsRecorder()]);
+    const bus = new PgEventBus((type) => registry.consumersFor(type));
+    const queue = new PgEventQueue(sql);
+    const dispatcher = new EventDispatcher(queue, registry);
     const watchRepo = new PgWatchRepository(sql);
-    cached = buildRouter({
-      watches: new WatchController(new WatchService(watchRepo)),
-      prices: new PriceController(new PriceService(watchRepo, new PgPriceRepository(sql), new StoreSearchPriceProvider())),
-    });
+    cached = {
+      dispatcher,
+      router: buildRouter({
+        watches: new WatchController(new WatchService(watchRepo)),
+        prices: new PriceController(new PriceService(watchRepo, new PgPriceRepository(sql, bus), new StoreSearchPriceProvider())),
+        events: new EventController(dispatcher, queue),
+      }),
+    };
   }
   return cached;
 }
+
+export const getRouter = (): Router => getApp().router;
+/** Lo usa el servidor local para correr el despachador en bucle (en Vercel lo disparan el cron o un webhook). */
+export const getDispatcher = (): EventDispatcher => getApp().dispatcher;

@@ -4,7 +4,8 @@
 //   DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador \
 //   AUTH_DEV_MODE=1 CRON_SECRET=cambia-esto npm run dev:api
 import { createServer } from 'node:http';
-import { getRouter } from '../lib/app.js';
+import { getDispatcher, getRouter } from '../lib/app.js';
+import { isDispatchEnabled } from '../lib/events/bus.js';
 import { toErrorResult } from '../lib/http/respond.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -59,4 +60,21 @@ createServer(async (req, res) => {
   res.end(result.body === undefined ? undefined : JSON.stringify(result.body));
 }).listen(PORT, () => {
   console.log(`API v1 local en http://localhost:${PORT}${PREFIX}`);
+  if (isDispatchEnabled()) {
+    // En Vercel el despachador lo despierta el cron o un webhook de la base; en local, un bucle.
+    const everyMs = Number(process.env.EVENTS_POLL_MS ?? 3000);
+    let running = false;
+    setInterval(() => {
+      if (running) return;
+      running = true;
+      getDispatcher()
+        .run()
+        .then((s) => s.reclamadas > 0 && console.log('eventos despachados:', JSON.stringify(s)))
+        .catch((err) => console.error('El despachador falló:', err))
+        .finally(() => {
+          running = false;
+        });
+    }, everyMs);
+    console.log(`Despachador de eventos activo (cada ${everyMs} ms).`);
+  }
 });
