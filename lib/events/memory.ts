@@ -3,7 +3,7 @@
 // de las pruebas de los servicios). Las de Postgres se prueban aparte, contra una base real.
 import { EVENT_VERSION, validatePayload, type EventType } from './catalog.js';
 import type { EventBus } from './bus.js';
-import type { ConsumerStats, Delivery, DeliveryStatus, EventQueue, EventStats, PublishInput, StoredEvent } from './types.js';
+import type { ClaimFilter, ConsumerStats, Delivery, DeliveryStatus, EventQueue, EventStats, PublishInput, StoredEvent } from './types.js';
 
 export class InMemoryEventBus implements EventBus {
   readonly published: Array<{ id: number; input: PublishInput }> = [];
@@ -70,10 +70,12 @@ export class InMemoryEventQueue implements EventQueue {
     return found;
   }
 
-  async claim(limit: number, lockSeconds: number): Promise<Delivery[]> {
+  async claim(limit: number, lockSeconds: number, filter: ClaimFilter = {}): Promise<Delivery[]> {
     const t = this.now();
     const ready = (r: Row) =>
-      ((r.status === 'pending' || r.status === 'failed') && r.nextAttemptAt <= t) || (r.status === 'processing' && r.lockedUntil !== null && r.lockedUntil < t);
+      (((r.status === 'pending' || r.status === 'failed') && r.nextAttemptAt <= t) || (r.status === 'processing' && r.lockedUntil !== null && r.lockedUntil < t)) &&
+      (filter.correlationId === undefined || r.event.correlationId === filter.correlationId) &&
+      (!filter.consumers?.length || filter.consumers.includes(r.consumer));
     // Mismo orden por agregado que el SQL: un evento anterior sin terminar (que no esté muerto) bloquea a los siguientes.
     const blocked = (r: Row) =>
       this.rows.some(

@@ -121,11 +121,27 @@ describe('despachador de eventos', () => {
     expect(queue.row(1, 'malo').status).toBe('failed');
   });
 
-  it('una entrega de un consumidor desconocido se reintenta (despliegue desfasado), no se pierde', async () => {
+  it('no toca las entregas de un consumidor que no conoce: quedan intactas para quien sí lo conoce', async () => {
+    // Otro código puede compartir la base (vista previa de Vercel, despliegue a medias). Reclamarlas las
+    // marcaría como fallidas y gastaría sus intentos hasta mandarlas a la cola de fallos sin culpa del evento.
+    queue.enqueue(event(1), ['fantasma', 'a']);
+    const spy = new Spy('a');
+    const summary = await dispatcherFor([spy]).run();
+    expect(summary).toMatchObject({ reclamadas: 1, hechas: 1 });
+    expect(queue.row(1, 'fantasma')).toMatchObject({ status: 'pending', attempts: 0, lastError: null });
+
+    // Cuando aparece un despachador que sí conoce al consumidor, la procesa normalmente.
+    const fantasma = new Spy('fantasma');
+    await dispatcherFor([fantasma]).run();
+    expect(fantasma.seen).toEqual([1]);
+    expect(queue.row(1, 'fantasma').status).toBe('done');
+  });
+
+  it('pedir consumidores que no conoce tampoco reclama nada', async () => {
     queue.enqueue(event(1), ['fantasma']);
-    const summary = await dispatcherFor([new Spy('a')]).run();
-    expect(summary.reintentos).toBe(1);
-    expect(queue.row(1, 'fantasma').lastError).toMatch(/no registrado/);
+    const summary = await dispatcherFor([new Spy('a')]).run({ consumers: ['fantasma'] });
+    expect(summary.reclamadas).toBe(0);
+    expect(queue.row(1, 'fantasma').attempts).toBe(0);
   });
 
   it('respeta el orden por agregado: no entrega el evento 2 mientras el 1 siga sin terminar', async () => {
@@ -212,6 +228,55 @@ describe('despachador de eventos', () => {
     expect(queue.row(1, 'a')).toMatchObject({ status: 'pending', attempts: 0 });
     expect(await queue.requeue({ consumer: 'a' })).toBe(1); // solo queda muerta la del evento 2
     expect(await queue.stats()).toMatchObject({ muertos: 0, porConsumidor: { a: { pending: 2 } } });
+  });
+});
+
+describe('despacho acotado y concurrencia', () => {
+  it('con filtros solo reclama lo pedido: una petición y ciertos consumidores', async () => {
+    const a = new Spy('a');
+    const b = new Spy('b');
+    queue.enqueue({ ...event(1, 'w1'), correlationId: 'req-1' }, ['a', 'b']);
+    queue.enqueue({ ...event(2, 'w2'), correlationId: 'req-2' }, ['a', 'b']);
+
+    const summary = await dispatcherFor([a, b]).run({ correlationId: 'req-1', consumers: ['a'] });
+
+    expect(a.seen).toEqual([1]);
+    expect(b.seen).toEqual([]);
+    expect(summary.hechasPorConsumidor).toEqual({ a: 1 });
+    expect(queue.row(1, 'b').status).toBe('pending');
+    expect(queue.row(2, 'a').status).toBe('pending');
+  });
+
+  it('cuenta las entregas hechas por consumidor', async () => {
+    queue.enqueue(event(1, 'w1'), ['a', 'b']);
+    queue.enqueue(event(2, 'w2'), ['a']);
+    const summary = await dispatcherFor([new Spy('a'), new Spy('b')]).run();
+    expect(summary.hechasPorConsumidor).toEqual({ a: 2, b: 1 });
+  });
+
+  it('nunca ejecuta más entregas a la vez que la concurrencia indicada', async () => {
+    let active = 0;
+    let peak = 0;
+    const spy = new Spy('a', async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+    });
+    for (let id = 1; id <= 12; id++) queue.enqueue(event(id, `w${id}`), ['a']);
+
+    const summary = await dispatcherFor([spy], { batchSize: 12, concurrency: 3 }).run();
+
+    expect(summary.hechas).toBe(12);
+    expect(peak).toBe(3);
+  });
+
+  it('con un presupuesto corto (despacho en línea) procesa al menos una tanda y se detiene', async () => {
+    const spy = new Spy('a');
+    for (let id = 1; id <= 10; id++) queue.enqueue(event(id, `w${id}`), ['a']);
+    const summary = await dispatcherFor([spy], { batchSize: 4 }).run({ budgetMs: 100 });
+    expect(summary.hechas).toBe(4);
+    expect(queue.rows.filter((r) => r.status === 'pending')).toHaveLength(6);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Sql } from '../db/client.js';
-import type { ConsumerStats, Delivery, EventQueue, EventStats, StoredEvent } from './types.js';
+import type { ClaimFilter, ConsumerStats, Delivery, EventQueue, EventStats, StoredEvent } from './types.js';
 
 interface EventRow {
   id: string;
@@ -20,8 +20,10 @@ const emptyStats = (): ConsumerStats => ({ pending: 0, processing: 0, done: 0, f
 export class PgEventQueue implements EventQueue {
   constructor(private readonly sql: Sql) {}
 
-  async claim(limit: number, lockSeconds: number): Promise<Delivery[]> {
+  async claim(limit: number, lockSeconds: number, filter: ClaimFilter = {}): Promise<Delivery[]> {
     const { sql } = this;
+    const byCorrelation = filter.correlationId ? sql`and e.correlation_id = ${filter.correlationId}` : sql``;
+    const byConsumer = filter.consumers?.length ? sql`and d.consumer in ${sql([...filter.consumers])}` : sql``;
     // Una sola sentencia: elige con `for update skip locked` (dos despachadores simultáneos nunca
     // reciben la misma entrega) y la marca «en curso» con un arrendamiento. Si la función muere,
     // el arrendamiento vence y la entrega vuelve a estar disponible.
@@ -36,6 +38,7 @@ export class PgEventQueue implements EventQueue {
         join public.domain_events e on e.id = d.event_id
         where ((d.status in ('pending', 'failed') and d.next_attempt_at <= now())
             or (d.status = 'processing' and d.locked_until < now()))
+          ${byCorrelation} ${byConsumer}
           and not exists (
             select 1
             from public.event_deliveries d2

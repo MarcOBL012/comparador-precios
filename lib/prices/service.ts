@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError, RateLimitedError, UpstreamError } from '../errors.js';
 import type { WatchRepository, Watch, WatchStatus } from '../watches/types.js';
 import { alertMessage, decide, summarizeHistory, type HistorySummary } from './alertRules.js';
+import type { EventCheckFlow } from './eventFlow.js';
 import type { AlertRecord, HistoryPoint, PriceProvider, PriceRepository } from './types.js';
 
 /** R3: una revisión manual cada 15 minutos por seguimiento (protege los créditos de las tiendas y la IA). */
@@ -54,7 +55,9 @@ export class PriceService {
     private readonly watches: WatchRepository,
     private readonly prices: PriceRepository,
     private readonly provider: PriceProvider,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    /** Con esto (EVENTS_ALERTS=on) las revisiones y las alertas pasan por eventos; sin esto, como antes. */
+    private readonly events?: EventCheckFlow
   ) {}
 
   async check(clerkId: string, watchId: string): Promise<CheckResult> {
@@ -85,6 +88,9 @@ export class PriceService {
   }
 
   private async execute(userId: string, watch: Watch): Promise<CheckResult> {
+    if (this.events) {
+      return this.events.check(userId, watch);
+    }
     let offers;
     try {
       offers = await this.provider.fetchOffers(watch.producto);
@@ -129,7 +135,10 @@ export class PriceService {
   }
 
   /** Lo llama el cron: revisa un lote de seguimientos atrasados; un fallo no detiene a los demás. */
-  async checkDue(batch = CRON_BATCH_SIZE): Promise<{ revisados: number; alertas: number; errores: number }> {
+  async checkDue(batch = CRON_BATCH_SIZE): Promise<{ revisados: number; alertas: number; errores: number; programados?: number }> {
+    if (this.events) {
+      return this.events.checkDue();
+    }
     const olderThan = new Date(this.now().getTime() - DUE_AFTER_HOURS * 3600 * 1000);
     const due = await this.prices.dueWatches(olderThan, batch);
     let revisados = 0;

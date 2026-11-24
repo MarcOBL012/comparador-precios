@@ -64,7 +64,30 @@ export interface HistoryPoint {
   precio: number;
 }
 
+/** Datos de trazabilidad del evento que publica una revisión: une toda la cadena de reacciones. */
+export interface RecordContext {
+  correlationId?: string | null;
+  causationId?: number | null;
+  /** `user:<id>` o `system`. */
+  actor?: string;
+}
+
+/** Resultado de guardar una revisión por eventos (sin decidir alertas). */
+export interface ObservationOutcome {
+  guardadas: number;
+  descartadas: number;
+  /** La mejor oferta guardada, con el id de su observación; null si no hubo ninguna. */
+  mejor: (Offer & { observationId: number }) | null;
+  /** Historial del producto ANTES de esta revisión. */
+  statsPrevias: HistoryStats;
+}
+
 export interface PriceRepository {
+  /** Revisión por eventos: guarda ofertas y publica `watch.checked`; las alertas las crea el AlertEvaluator. */
+  recordObservations(watch: WatchRef, offers: Offer[], ctx?: RecordContext): Promise<ObservationOutcome>;
+  /** Alertas de un seguimiento nacidas de una observación concreta (las de una revisión). */
+  alertsOfObservation(watchId: string, observationId: number): Promise<AlertRecord[]>;
+  countAlertsOfRun(correlationId: string): Promise<number>;
   /**
    * Guarda una revisión de forma atómica: ofertas, alertas, estado, última revisión y eventos de
    * dominio, todo en una transacción. `decide` (reglas puras) recibe el historial ANTERIOR a esta revisión.

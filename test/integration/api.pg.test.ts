@@ -5,16 +5,14 @@
 //   TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/comparador npm test
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildRouter } from '../../lib/app';
+import { buildDomain } from '../../lib/compose';
 import { createSql, type Sql } from '../../lib/db/client';
 import { PriceController } from '../../lib/prices/controller';
-import { PgPriceRepository } from '../../lib/prices/repository';
-import { PriceService } from '../../lib/prices/service';
 import type { Offer, PriceProvider } from '../../lib/prices/types';
 import { WatchController } from '../../lib/watches/controller';
-import { PgWatchRepository } from '../../lib/watches/repository';
-import { WatchService } from '../../lib/watches/service';
 
 const URL = process.env.TEST_DATABASE_URL;
+const EVENTS_MODE = process.env.EVENTS_ALERTS === 'on';
 const RUN = `it_${Date.now()}`;
 
 const PRODUCTO = { marca: 'Free Tea', nombre: `Frutos Rojos ${RUN}`, presentacion: '500ml', categoria: 'bebidas', tipo: 'té' };
@@ -67,11 +65,13 @@ describe.skipIf(!URL)('API v1 contra Postgres real', () => {
   beforeEach(async () => {
     provider = new StubProvider();
     clock = new Date('2026-11-03T12:00:00Z');
-    const watchRepo = new PgWatchRepository(sql);
+    // La misma suite corre en los dos modos: EVENTS_ALERTS=on prueba que las revisiones y alertas por
+    // eventos dan EXACTAMENTE las mismas respuestas HTTP que el modo anterior.
+    const domain = buildDomain({ sql, provider, events: EVENTS_MODE, now: () => clock, log: () => {}, dispatcherOptions: { log: () => {} } });
     router = buildRouter(
       {
-        watches: new WatchController(new WatchService(watchRepo)),
-        prices: new PriceController(new PriceService(watchRepo, new PgPriceRepository(sql), provider, () => clock)),
+        watches: new WatchController(domain.watchService),
+        prices: new PriceController(domain.priceService),
       },
       async ({ headers }) => (typeof headers['x-dev-user'] === 'string' ? { clerkId: headers['x-dev-user'] } : null)
     );
@@ -164,7 +164,9 @@ describe.skipIf(!URL)('API v1 contra Postgres real', () => {
 
     const events = await sql<{ event_type: string }[]>`
       select event_type from public.domain_events where aggregate_id = ${id} or payload->>'watchId' = ${id} order by id`;
-    expect(events.map((e) => e.event_type)).toEqual(['watch.checked', 'alert.created']);
+    // Lo que la revisión publica no cambia entre modos; el modo por eventos además publica el alta (`watch.created`).
+    expect(events.map((e) => e.event_type).filter((t) => t !== 'watch.created')).toEqual(['watch.checked', 'alert.created']);
+    expect(events.some((e) => e.event_type === 'watch.created')).toBe(EVENTS_MODE);
   });
 
   it('alertas: se listan, se filtran por no leídas y se marcan como leídas', async () => {
@@ -216,7 +218,9 @@ describe.skipIf(!URL)('API v1 contra Postgres real', () => {
     const res = await call('POST', `/watches/${id}/check`);
 
     expect(res.status).toBe(502);
-    const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from public.domain_events where aggregate_id = ${id}`;
+    // La revisión fallida no publica nada (el alta `watch.created`, del modo por eventos, es anterior y se ignora).
+    const [{ n }] = await sql<{ n: number }[]>`
+      select count(*)::int as n from public.domain_events where aggregate_id = ${id} and event_type <> 'watch.created'`;
     expect(n).toBe(0);
   });
 
